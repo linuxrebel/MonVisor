@@ -1,6 +1,6 @@
 # MonVisor — Project State
 # Location: /mnt/data/git/AI/MonVisor/MD-Files/PROJECT_STATE.md
-# Last updated: 2026-06-01 (Phase 4 complete; blackbox fallback + recommendations added)
+# Last updated: 2026-06-01 (Phase 4.5 complete; self-contained packaging + buildable repo)
 # Purpose: Full context for resuming work after context window reset
 
 ---
@@ -247,6 +247,30 @@ Remote detection: SSH tunnel instructions auto-printed when no display detected
   Note: AppImage not yet built/verified end-to-end (scaffold). PyInstaller
   path (scripts/build_binary.sh) for Mac/Win still pending.
 
+### PHASE 4.5 — Packaging / Distribution [COMPLETE]
+  ✓ RAG knowledge (corpus.jsonl + exemplars/) bundled INSIDE the package at
+    monvisor/knowledge/v1.0/ — init is now self-contained, no external mon-proj
+    checkout required.
+  ✓ config.py resolves corpus/exemplars bundle-first: env override
+    (MONVISOR_CORPUS / MONVISOR_EXEMPLARS) → bundled → mon-proj dev fallback.
+  ✓ pyproject.toml: [tool.setuptools.package-data] ships knowledge + web
+    templates/static in the wheel; include-package-data + MANIFEST.in for sdist;
+    metadata added (license=MIT, authors, classifiers); setuptools>=64.
+  ✓ Added README.md (was referenced by pyproject but missing → clean builds had
+    been failing), LICENSE (MIT), .gitignore.
+  ✓ Git: previously-UNTRACKED source tree (monvisor/, pyproject.toml, scripts/)
+    is now committed. Vestigial empty root knowledge/ removed.
+  ✓ Verified: `python -m build` produces wheel + sdist; both contain corpus,
+    all 14 exemplars, 6 web assets. Fresh venv install (--no-deps) resolves the
+    bundled corpus from site-packages and installs the `monvisor` entry point.
+  ✓ Minimal smoke tests added under tests/ (packaging + CLI wiring).
+
+  Bug fixed during this phase: bundled-path lookup used knowledge/1.0 while the
+  dir is v1.0, so it silently fell back to the dev path until corrected.
+
+  STILL PENDING: no git remote yet (push when ready). AppImage/PyInstaller
+  remain scaffolds. Deploy + paid features are Phase 5.
+
 ### PHASE 5 — Paid Features [NEXT]
   - SSH config deploy
   - Grafana dashboard provisioning API
@@ -287,10 +311,8 @@ Remote detection: SSH tunnel instructions auto-printed when no display detected
 │       ├── __init__.py
 │       ├── templates/         ← empty (Phase 3)
 │       └── static/            ← empty (Phase 3)
-├── knowledge/
-│   └── v1.0/
-│       └── stock_dashboards/  ← empty (Phase 5)
-├── tests/                     ← empty (to be populated)
+├── knowledge/                 ← REMOVED (bundled into monvisor/knowledge/v1.0/)
+├── tests/                     ← smoke tests (packaging + CLI wiring)
 ├── scripts/                   ← empty (Phase 4 packaging)
 ├── MD-Files/
 │   ├── PROJECT_STATE.md       ← this file
