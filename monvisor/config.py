@@ -30,12 +30,12 @@ KNOWLEDGE_VERSION = "1.0"
 
 # Default knowledge ships *inside* the package (monvisor/knowledge/v<ver>/) so a
 # fresh install is self-contained. A developer checkout may override with
-# MONVISOR_CORPUS / MONVISOR_EXEMPLARS, and we fall back to the original mon-proj
-# layout if the bundle is somehow absent.
+# MONVISOR_CORPUS / MONVISOR_EXEMPLARS, and we fall back to a sibling
+# MonVisor-Corpus checkout if the bundle is somehow absent.
 _PKG_DIR       = Path(__file__).resolve().parent
 _BUNDLED_KB    = _PKG_DIR / "knowledge" / f"v{KNOWLEDGE_VERSION}"
-_DEV_CORPUS    = Path("/mnt/data/git/mon-proj/train/train.jsonl")
-_DEV_EXEMPLARS = Path("/mnt/data/git/mon-proj/exemplars")
+_DEV_CORPUS    = _PKG_DIR.parent.parent / "MonVisor-Corpus" / "corpus" / "combined.jsonl"
+_DEV_EXEMPLARS = _PKG_DIR.parent.parent / "MonVisor-Corpus" / "exemplars"
 
 
 def _first_existing(*candidates) -> Path:
