@@ -1,0 +1,57 @@
+# node_exporter_textfile.prom — textfile collector example metrics
+# Drop files like this in: /var/lib/node_exporter/textfile_collector/
+# Enable with: --collector.textfile.directory=/var/lib/node_exporter/textfile_collector
+# Files must end in .prom and use Prometheus text exposition format.
+# Source: https://github.com/prometheus/node_exporter#textfile-collector
+
+# HELP backup_last_success_timestamp_seconds Unix timestamp of last successful backup
+# TYPE backup_last_success_timestamp_seconds gauge
+backup_last_success_timestamp_seconds{job="daily_backup",target="db01"} 1748563200.0
+
+# HELP backup_duration_seconds Duration of last backup in seconds
+# TYPE backup_duration_seconds gauge
+backup_duration_seconds{job="daily_backup",target="db01"} 142.7
+
+# HELP backup_size_bytes Size of last backup archive in bytes
+# TYPE backup_size_bytes gauge
+backup_size_bytes{job="daily_backup",target="db01"} 5368709120
+
+# HELP cron_job_last_success_timestamp_seconds Unix timestamp of last successful cron run
+# TYPE cron_job_last_success_timestamp_seconds gauge
+cron_job_last_success_timestamp_seconds{job="log_rotate"} 1748563800.0
+cron_job_last_success_timestamp_seconds{job="cache_cleanup"} 1748563500.0
+
+# HELP cron_job_exit_code Exit code of last cron job run (0 = success)
+# TYPE cron_job_exit_code gauge
+cron_job_exit_code{job="log_rotate"} 0
+cron_job_exit_code{job="cache_cleanup"} 0
+
+# HELP software_version_info Installed software versions (value always 1)
+# TYPE software_version_info gauge
+software_version_info{name="myapp",version="2.4.1",build="abc123"} 1
+software_version_info{name="nginx",version="1.24.0",build=""} 1
+
+# HELP ssl_certificate_expiry_timestamp_seconds SSL cert expiry as Unix timestamp
+# TYPE ssl_certificate_expiry_timestamp_seconds gauge
+ssl_certificate_expiry_timestamp_seconds{domain="api.example.com"} 1764345600.0
+ssl_certificate_expiry_timestamp_seconds{domain="www.example.com"} 1764345600.0
+
+# HELP host_license_expiry_timestamp_seconds License expiry as Unix timestamp
+# TYPE host_license_expiry_timestamp_seconds gauge
+host_license_expiry_timestamp_seconds{product="enterprise_suite"} 1780000000.0
+
+# Example cron job script that writes the above:
+# #!/bin/bash
+# TEXTFILE_DIR="/var/lib/node_exporter/textfile_collector"
+# TMP=$(mktemp)
+# /usr/local/bin/run_backup.sh
+# EXIT_CODE=$?
+# cat > "$TMP" << EOF
+# # HELP backup_last_success_timestamp_seconds Unix timestamp of last backup
+# # TYPE backup_last_success_timestamp_seconds gauge
+# backup_last_success_timestamp_seconds{job="daily_backup"} $(date +%s)
+# # HELP backup_last_exit_code Exit code of last backup
+# # TYPE backup_last_exit_code gauge
+# backup_last_exit_code{job="daily_backup"} ${EXIT_CODE}
+# EOF
+# mv "$TMP" "${TEXTFILE_DIR}/backup.prom"

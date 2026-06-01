@@ -1,0 +1,58 @@
+# /etc/grafana/provisioning/dashboards/dashboard.yaml
+# Grafana 13.0.1 — Dashboard provisioning
+# Source: https://grafana.com/docs/grafana/latest/administration/provisioning/
+
+apiVersion: 1
+
+providers:
+
+  # Infrastructure dashboards
+  - name: infrastructure
+    orgId: 1
+    folder: Infrastructure
+    folderUid: infrastructure
+    type: file
+    disableDeletion: false       # delete dashboards removed from disk
+    updateIntervalSeconds: 30    # poll for changes every 30s
+    allowUiUpdates: false        # prevent UI edits (GitOps)
+    options:
+      path: /etc/grafana/dashboards/infrastructure
+      foldersFromFilesStructure: false
+
+  # Application dashboards
+  - name: applications
+    orgId: 1
+    folder: Applications
+    folderUid: applications
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards/applications
+      foldersFromFilesStructure: false
+
+  # SLO / SLA dashboards
+  - name: slo
+    orgId: 1
+    folder: SLO
+    folderUid: slo
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 60
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards/slo
+      foldersFromFilesStructure: false
+
+# Expected directory structure:
+# /etc/grafana/dashboards/
+# ├── infrastructure/
+# │   ├── node-exporter-full.json
+# │   ├── prometheus-stats.json
+# │   └── alertmanager-overview.json
+# ├── applications/
+# │   ├── red-method-api.json
+# │   └── mysql-overview.json
+# └── slo/
+#     └── slo-overview.json

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}MonVisor — Environments{% endblock %}
+{% block content %}
+<h2>Environments</h2>
+{% if not envs %}
+  <p class="muted">No environments yet. Create one: <code>monvisor env add prod 192.168.1.0/24</code></p>
+{% else %}
+<table class="grid">
+  <thead><tr><th>Name</th><th>Services</th><th>Monitored</th><th>Undecided</th><th></th></tr></thead>
+  <tbody>
+  {% for e in envs %}
+    <tr>
+      <td class="bold">{{ e.name }}</td>
+      <td>{{ e.services }}</td>
+      <td class="ok">{{ e.monitored }}</td>
+      <td class="warn">{{ e.undecided }}</td>
+      <td><a class="btn sm" href="/env/{{ e.name }}">Review</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

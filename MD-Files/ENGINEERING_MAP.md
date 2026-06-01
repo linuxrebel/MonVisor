@@ -407,34 +407,39 @@ server {
 
 ## Build Phases
 
-### Phase 1 — Foundation (build first)
-- Project scaffold, pyproject.toml, CLI entry point
-- SQLite schema + query functions
-- `monvisor init` command
-- Knowledge package ingest into ChromaDB
-- Basic RAG query (verify corpus is searchable)
+### Phase 1 — Foundation [COMPLETE]
+- ✓ Project scaffold, pyproject.toml, Click CLI entry point
+- ✓ SQLite schema + all tables + query functions
+- ✓ monvisor init command working
+- ✓ ChromaDB loaded: 275 corpus pairs + 51 exemplar chunks
+- ✓ bcrypt auth (SimpleAuthProvider)
+- ✓ RAG query verification passing
+- ✓ nomic-embed-text pulled and working
+- ✓ Package installed system-wide (pip install -e .)
+- Fixes: Ollama API version-safe detection, exemplar chunking (1400 char max)
 
-### Phase 2 — Discovery
-- CIDR scan with nmap
-- Service fingerprinting
+### Phase 2 — Discovery [NEXT]
+- CIDR scan with python-nmap
+- Service fingerprinting (port → service type, HTTP probing)
 - Rich terminal report
-- HTML report generation
-- `monvisor scan` command
+- HTML report generation → ~/.monvisor/reports/
+- monvisor scan command (currently stub)
 
 ### Phase 3 — Review + Generate
-- Terminal review workflow
+- Terminal review workflow (CLI yes/no per service)
 - Web UI (FastAPI + Jinja2 templates)
-- Simple auth (bcrypt)
-- RAG-backed config generation
-- YAML validation
-- `monvisor review` and `monvisor generate` commands
+- Simple bcrypt auth on web UI
+- RAG-backed config generation via Ollama
+- YAML validation (promtool)
+- monvisor review and monvisor generate commands
+- monvisor ui command
 
 ### Phase 4 — Polish + Package
-- Nginx config generation
-- SSH tunnel detection
+- Nginx config auto-generation
+- SSH tunnel detection + auto-print instructions
 - AppImage packaging
 - Knowledge update installer
-- `monvisor knowledge update` command
+- monvisor knowledge update command
 
 ### Phase 5 — Paid Features
 - SSH deploy

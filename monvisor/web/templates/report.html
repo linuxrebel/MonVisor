@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}MonVisor — {{ env }}{% endblock %}
+{% block content %}
+<div class="rowhead">
+  <h2>Review — <span class="accent">{{ env }}</span></h2>
+  <button class="btn" id="generate-btn" data-env="{{ env }}">Generate configs</button>
+</div>
+<p class="muted" id="gen-status"></p>
+{% if not services %}
+  <p class="muted">No services. Run <code>monvisor scan {{ env }}</code> first.</p>
+{% else %}
+<table class="grid">
+  <thead><tr><th>Host</th><th>Port</th><th>Service</th><th>Version</th><th>Monitor?</th></tr></thead>
+  <tbody>
+  {% for s in services %}
+    <tr data-id="{{ s.id }}">
+      <td class="bold">{{ s.host }}</td>
+      <td class="num">{{ s.port }}</td>
+      <td class="{% if s.service_type %}accent{% endif %}">{{ s.service_type or 'unknown' }}</td>
+      <td class="muted">{{ s.version or '—' }}</td>
+      <td>
+        <div class="toggle" data-id="{{ s.id }}">
+          <button class="t-yes {% if s.monitor == 1 %}on{% endif %}" data-v="1">Yes</button>
+          <button class="t-no {% if s.monitor == 0 %}on{% endif %}" data-v="0">No</button>
+        </div>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

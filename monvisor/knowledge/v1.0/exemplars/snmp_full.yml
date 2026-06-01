@@ -1,0 +1,102 @@
+# snmp_full.yml — SNMP exporter module configuration reference
+# Source: https://github.com/prometheus/snmp_exporter
+# Covers: SNMPv2c, SNMPv3, common MIBs (ifMIB, system, UPS, PDU)
+
+modules:
+
+  # ── Interface statistics (ifMIB) — SNMPv2c ────────────────────────────────
+  if_mib:
+    walk:
+      - sysUpTime
+      - interfaces
+      - ifXTable
+    get:
+      - sysDescr
+      - sysName
+      - sysLocation
+    version: 2
+    auth:
+      community: public
+
+  # ── System info ────────────────────────────────────────────────────────────
+  system_mib:
+    walk:
+      - sysUpTime
+      - sysDescr
+      - sysName
+      - sysContact
+      - sysLocation
+    version: 2
+    auth:
+      community: public
+
+  # ── SNMPv3 with authentication and privacy ────────────────────────────────
+  if_mib_v3:
+    walk:
+      - interfaces
+      - ifXTable
+    version: 3
+    auth:
+      security_level: authPriv
+      username: snmpuser
+      password: authpassword123        # min 8 chars
+      auth_protocol: SHA               # MD5 or SHA
+      priv_protocol: AES               # DES or AES
+      priv_password: privpassword123   # min 8 chars
+      # For SNMPv3 with auth but no privacy:
+      # security_level: authNoPriv
+
+  # ── SNMPv3 no auth (not recommended for production) ───────────────────────
+  if_mib_v3_noauth:
+    walk:
+      - interfaces
+    version: 3
+    auth:
+      security_level: noAuthNoPriv
+      username: public
+
+  # ── UPS monitoring (RFC 1628) ─────────────────────────────────────────────
+  ups_mib:
+    walk:
+      - upsIdent
+      - upsBattery
+      - upsInput
+      - upsOutput
+      - upsAlarm
+    version: 2
+    auth:
+      community: public
+
+# prometheus.yml scrape config to use these modules:
+#
+# scrape_configs:
+#   - job_name: snmp_switches
+#     metrics_path: /snmp
+#     params:
+#       module: [if_mib]
+#     static_configs:
+#       - targets:
+#           - switch01.mgmt.example.com
+#           - switch02.mgmt.example.com
+#     relabel_configs:
+#       - source_labels: [__address__]
+#         target_label: __param_target
+#       - source_labels: [__param_target]
+#         target_label: instance
+#       - target_label: __address__
+#         replacement: snmp-exporter:9116
+#
+#   - job_name: snmp_ups
+#     metrics_path: /snmp
+#     params:
+#       module: [ups_mib]
+#     static_configs:
+#       - targets:
+#           - ups01.mgmt.example.com
+#     relabel_configs:
+#       - source_labels: [__address__]
+#         target_label: __param_target
+#       - source_labels: [__param_target]
+#         target_label: instance
+#       - target_label: __address__
+#         replacement: snmp-exporter:9116

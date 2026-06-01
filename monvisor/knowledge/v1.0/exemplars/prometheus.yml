@@ -1,0 +1,68 @@
+# global default prometheus.yml — complete working example
+# Prometheus v3.12.0
+# Source: https://prometheus.io/docs/prometheus/latest/configuration/configuration/
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: production
+    replica: 1
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - localhost:9093
+      timeout: 10s
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090
+
+  # Linux host metrics via node_exporter
+  - job_name: node
+    static_configs:
+      - targets:
+          - web01:9100
+          - web02:9100
+          - db01:9100
+        labels:
+          env: production
+
+  # HTTP endpoint probing via blackbox_exporter
+  - job_name: blackbox_http
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://api.example.com/health
+          - https://www.example.com
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: localhost:9115
+
+  # File-based service discovery (dynamic targets, no reload needed)
+  - job_name: dynamic_nodes
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/*.json
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+remote_write: []
+remote_read: []

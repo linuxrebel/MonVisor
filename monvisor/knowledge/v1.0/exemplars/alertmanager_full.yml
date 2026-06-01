@@ -1,0 +1,208 @@
+# alertmanager_full.yml — Complete Alertmanager configuration reference
+# Alertmanager v0.32.1
+# Covers: global, templates, time_intervals, full routing tree, all receiver types,
+#         inhibition rules, tracing
+# Source: https://prometheus.io/docs/alerting/latest/configuration/
+
+global:
+  resolve_timeout: 5m
+
+  # SMTP (email)
+  smtp_smarthost: 'smtp.example.com:587'
+  smtp_from: 'alertmanager@example.com'
+  smtp_auth_username: 'alertmanager@example.com'
+  smtp_auth_password_file: /etc/alertmanager/smtp-password
+  smtp_require_tls: true
+
+  # Slack
+  slack_api_url_file: /etc/alertmanager/slack-webhook-url
+
+  # PagerDuty
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+
+  # OpsGenie
+  opsgenie_api_url: 'https://api.opsgenie.com/'
+  opsgenie_api_key_file: /etc/alertmanager/opsgenie-key
+
+  # HTTP client defaults for outgoing webhook calls
+  http_config:
+    tls_config:
+      insecure_skip_verify: false
+
+templates:
+  - /etc/alertmanager/templates/*.tmpl
+
+# ── Time intervals ─────────────────────────────────────────────────────────
+time_intervals:
+  - name: business-hours
+    time_intervals:
+      - weekdays: ['monday:friday']
+        times:
+          - start_time: '09:00'
+            end_time: '18:00'
+        location: 'America/New_York'
+
+  - name: weekends
+    time_intervals:
+      - weekdays: ['saturday', 'sunday']
+
+  - name: maintenance-window
+    time_intervals:
+      - weekdays: ['sunday']
+        times:
+          - start_time: '02:00'
+            end_time: '05:00'
+
+# ── Routing tree ───────────────────────────────────────────────────────────
+route:
+  receiver: slack-ops-default
+  group_by: [alertname, cluster, service]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+  routes:
+    # Watchdog — silence, never notify
+    - matchers:
+        - alertname="Watchdog"
+      receiver: "null"
+
+    # Critical: fast path to PagerDuty, mute during maintenance
+    - matchers:
+        - severity="critical"
+      receiver: pagerduty-critical
+      group_wait: 10s
+      repeat_interval: 1h
+      mute_time_intervals:
+        - maintenance-window
+      continue: false
+
+    # Database alerts: route to DBA team
+    - matchers:
+        - team="dba"
+      receiver: slack-dba
+      group_by: [alertname, cluster, database]
+      repeat_interval: 2h
+
+    # Warning alerts: weekends go to PagerDuty, weekdays to Slack
+    - matchers:
+        - severity="warning"
+      active_time_intervals:
+        - weekends
+      receiver: pagerduty-warning
+      repeat_interval: 4h
+
+    - matchers:
+        - severity="warning"
+      receiver: slack-ops-default
+      repeat_interval: 4h
+
+    # Info: email only during business hours
+    - matchers:
+        - severity="info"
+      active_time_intervals:
+        - business-hours
+      receiver: email-ops
+
+# ── Receivers ─────────────────────────────────────────────────────────────
+receivers:
+  - name: "null"
+
+  - name: slack-ops-default
+    slack_configs:
+      - api_url_file: /etc/alertmanager/slack-webhook-url
+        channel: '#alerts'
+        icon_emoji: ':fire:'
+        title: '{{ template "slack.ops.title" . }}'
+        text: '{{ template "slack.ops.text" . }}'
+        send_resolved: true
+        http_config:
+          tls_config:
+            insecure_skip_verify: false
+
+  - name: slack-dba
+    slack_configs:
+      - api_url_file: /etc/alertmanager/slack-dba-webhook-url
+        channel: '#dba-alerts'
+        title: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+
+  - name: pagerduty-critical
+    pagerduty_configs:
+      - routing_key_file: /etc/alertmanager/pagerduty-critical-key
+        description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+        severity: critical
+        client: Alertmanager
+        client_url: '{{ template "pagerduty.default.clientURL" . }}'
+        details:
+          firing: '{{ .Alerts.Firing | len }}'
+          resolved: '{{ .Alerts.Resolved | len }}'
+        send_resolved: true
+
+  - name: pagerduty-warning
+    pagerduty_configs:
+      - routing_key_file: /etc/alertmanager/pagerduty-warning-key
+        severity: warning
+        send_resolved: true
+
+  - name: email-ops
+    email_configs:
+      - to: 'ops-team@example.com'
+        from: 'alertmanager@example.com'
+        smarthost: 'smtp.example.com:587'
+        auth_username: 'alertmanager@example.com'
+        auth_password_file: /etc/alertmanager/smtp-password
+        require_tls: true
+        headers:
+          Subject: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+        html: '{{ template "email.ops.html" . }}'
+        send_resolved: true
+
+  - name: webhook-generic
+    webhook_configs:
+      - url: 'https://hooks.example.com/alertmanager'
+        send_resolved: true
+        http_config:
+          bearer_token_file: /etc/alertmanager/webhook-token
+          tls_config:
+            ca_file: /etc/alertmanager/certs/ca.pem
+        max_alerts: 10
+
+  - name: opsgenie-ops
+    opsgenie_configs:
+      - api_key_file: /etc/alertmanager/opsgenie-key
+        message: '{{ .GroupLabels.alertname }}'
+        description: '{{ .CommonAnnotations.description }}'
+        priority: '{{ if eq .CommonLabels.severity "critical" }}P1{{ else }}P3{{ end }}'
+        tags: 'prometheus,{{ .GroupLabels.cluster }}'
+        send_resolved: true
+
+# ── Inhibition rules ───────────────────────────────────────────────────────
+inhibit_rules:
+  # Suppress warnings when critical fires for same component
+  - source_matchers:
+      - severity="critical"
+    target_matchers:
+      - severity="warning"
+    equal: [alertname, cluster, service]
+
+  # Suppress all alerts when the node is completely down
+  - source_matchers:
+      - alertname="NodeDown"
+    target_matchers:
+      - severity=~"warning|critical"
+    equal: [instance]
+
+  # Suppress service alerts when cluster is in maintenance
+  - source_matchers:
+      - alertname="ClusterMaintenance"
+    target_matchers:
+      - team="ops"
+    equal: [cluster]
+
+# ── Tracing (optional, Alertmanager v0.25+) ───────────────────────────────
+tracing:
+  endpoint: jaeger:4317
+  insecure: true
+  sampling_fraction: 0.1

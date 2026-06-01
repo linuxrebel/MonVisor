@@ -1,0 +1,289 @@
+# prometheus_full.yml — Complete Prometheus configuration reference
+# Prometheus v3.12.0
+# Covers: global, alerting, rule_files, scrape_configs with all auth types,
+#         TLS, relabeling, multiple service discovery methods, remote_write, remote_read
+# Source: https://prometheus.io/docs/prometheus/latest/configuration/configuration/
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: production
+    replica: '1'
+  query_log_file: /var/log/prometheus/query.log
+  scrape_failure_log_file: /var/log/prometheus/scrape_failures.log
+  body_size_limit: 0
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager-1:9093
+            - alertmanager-2:9093
+      scheme: https
+      tls_config:
+        ca_file: /etc/prometheus/certs/alertmanager-ca.pem
+        cert_file: /etc/prometheus/certs/prometheus-cert.pem
+        key_file: /etc/prometheus/certs/prometheus-key.pem
+      basic_auth:
+        username: prometheus
+        password_file: /etc/prometheus/alertmanager-password
+      timeout: 10s
+      api_version: v2
+
+rule_files:
+  - /etc/prometheus/rules/recording_rules.yml
+  - /etc/prometheus/rules/alerting_rules.yml
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+
+  # ── Self-monitoring ────────────────────────────────────────────────────────
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090
+
+  # ── Static config with basic auth ─────────────────────────────────────────
+  - job_name: node_static
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    scheme: http
+    honor_labels: false
+    honor_timestamps: true
+    basic_auth:
+      username: scraper
+      password_file: /etc/prometheus/node-password
+    static_configs:
+      - targets:
+          - web01:9100
+          - web02:9100
+          - db01:9100
+        labels:
+          env: production
+          region: us-east-1
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '([^:]+).*'
+        target_label: hostname
+        replacement: '$1'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'go_gc_.*'
+        action: drop
+
+  # ── Static config with TLS client cert ────────────────────────────────────
+  - job_name: node_tls
+    scheme: https
+    tls_config:
+      ca_file: /etc/prometheus/certs/ca.pem
+      cert_file: /etc/prometheus/certs/client-cert.pem
+      key_file: /etc/prometheus/certs/client-key.pem
+      server_name: node-exporter.internal
+      insecure_skip_verify: false
+      min_version: TLS12
+    static_configs:
+      - targets:
+          - secure-host:9100
+
+  # ── OAuth2 scrape auth ────────────────────────────────────────────────────
+  - job_name: app_oauth2
+    scheme: https
+    oauth2:
+      client_id: prometheus-scraper
+      client_secret_file: /etc/prometheus/oauth2-secret
+      token_url: https://auth.example.com/oauth2/token
+      scopes:
+        - metrics:read
+      tls_config:
+        ca_file: /etc/prometheus/certs/ca.pem
+    static_configs:
+      - targets:
+          - app-server:8080
+
+  # ── Bearer token auth ─────────────────────────────────────────────────────
+  - job_name: app_bearer
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/bearer-token
+    static_configs:
+      - targets:
+          - api-server:9090
+
+  # ── File-based service discovery ──────────────────────────────────────────
+  - job_name: file_sd
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/*.json
+          - /etc/prometheus/targets/*.yaml
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__meta_filepath]
+        target_label: target_file
+
+  # ── Kubernetes pod discovery ──────────────────────────────────────────────
+  - job_name: kubernetes_pods
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - production
+            - monitoring
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: "true"
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::[0-9]+)?;([0-9]+)
+        replacement: '$1:$2'
+        target_label: __address__
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        target_label: app
+
+  # ── Kubernetes node discovery ─────────────────────────────────────────────
+  - job_name: kubernetes_nodes
+    kubernetes_sd_configs:
+      - role: node
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+
+  # ── Consul service discovery ──────────────────────────────────────────────
+  - job_name: consul_services
+    consul_sd_configs:
+      - server: consul.service.consul:8500
+        services:
+          - node-exporter
+          - app-metrics
+        tags:
+          - prometheus
+        token: CHANGEME_CONSUL_TOKEN
+        tls_config:
+          ca_file: /etc/prometheus/certs/consul-ca.pem
+    relabel_configs:
+      - source_labels: [__meta_consul_service]
+        target_label: job
+      - source_labels: [__meta_consul_node]
+        target_label: instance
+      - source_labels: [__meta_consul_tags]
+        regex: '.*,env=([^,]+),.*'
+        target_label: env
+        replacement: '$1'
+
+  # ── DNS service discovery ─────────────────────────────────────────────────
+  - job_name: dns_sd
+    dns_sd_configs:
+      - names:
+          - _prometheus._tcp.example.com
+        type: SRV
+        refresh_interval: 30s
+
+  # ── HTTP service discovery ────────────────────────────────────────────────
+  - job_name: http_sd
+    http_sd_configs:
+      - url: https://service-registry.internal/prometheus/targets
+        refresh_interval: 60s
+        basic_auth:
+          username: prometheus
+          password_file: /etc/prometheus/sd-password
+
+  # ── Blackbox exporter (multi-target pattern) ──────────────────────────────
+  - job_name: blackbox_http
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://api.example.com/health
+          - https://www.example.com
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  - job_name: blackbox_icmp
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    static_configs:
+      - targets:
+          - gateway.example.com
+          - 8.8.8.8
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # ── SNMP exporter (multi-target pattern) ─────────────────────────────────
+  - job_name: snmp_switches
+    metrics_path: /snmp
+    params:
+      module: [if_mib]
+    static_configs:
+      - targets:
+          - 192.168.1.1
+          - 192.168.1.2
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: snmp-exporter:9116
+
+  # ── Pushgateway ──────────────────────────────────────────────────────────
+  - job_name: pushgateway
+    honor_labels: true
+    static_configs:
+      - targets:
+          - pushgateway:9091
+
+# ── Remote write ──────────────────────────────────────────────────────────
+remote_write:
+  - url: http://thanos-receive:19291/api/v1/receive
+    name: thanos
+    remote_timeout: 30s
+    write_relabel_configs:
+      - source_labels: [env]
+        regex: production
+        action: keep
+    queue_config:
+      capacity: 10000
+      max_shards: 30
+      min_shards: 1
+      max_samples_per_send: 2000
+      batch_send_deadline: 5s
+      min_backoff: 30ms
+      max_backoff: 5s
+      retry_on_http_429: true
+    tls_config:
+      ca_file: /etc/prometheus/certs/thanos-ca.pem
+
+# ── Remote read ───────────────────────────────────────────────────────────
+remote_read:
+  - url: http://thanos-query:10902/api/v1/read
+    name: thanos-historical
+    read_recent: false
+    tls_config:
+      ca_file: /etc/prometheus/certs/thanos-ca.pem

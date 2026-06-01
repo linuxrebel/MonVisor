@@ -1,0 +1,63 @@
+# /etc/grafana/provisioning/datasources/prometheus.yaml
+# Grafana 13.0.1 — Prometheus datasource provisioning
+# Source: https://grafana.com/docs/grafana/latest/administration/provisioning/
+
+apiVersion: 1
+
+# deleteDatasources removes datasources that are no longer in this file
+deleteDatasources:
+  - name: OldPrometheus
+    orgId: 1
+
+datasources:
+
+  # Primary Prometheus datasource
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus-main
+    orgId: 1
+    url: http://prometheus:9090
+    access: proxy              # proxy = server-side; direct = browser-side (not recommended)
+    isDefault: true
+    editable: false            # prevent UI edits (GitOps)
+    jsonData:
+      timeInterval: 15s        # should match scrape_interval
+      queryTimeout: 60s
+      httpMethod: POST         # POST is more efficient for large queries
+      prometheusType: Prometheus
+      prometheusVersion: 3.12.0
+      cacheLevel: Low
+      disableMetricsLookup: false
+      incrementalQuerying: true
+      incrementalQueryOverlapWindow: 10m
+      # Exemplar tracing integration (requires Tempo datasource)
+      exemplarTraceIdDestinations:
+        - name: traceID
+          datasourceUid: tempo-main
+          urlDisplayLabel: View in Tempo
+
+  # Thanos/long-term Prometheus (read-only, for historical dashboards)
+  - name: Prometheus-Historical
+    type: prometheus
+    uid: prometheus-historical
+    orgId: 1
+    url: http://thanos-query:10902
+    access: proxy
+    isDefault: false
+    editable: false
+    jsonData:
+      timeInterval: 60s
+      queryTimeout: 120s
+      httpMethod: POST
+      prometheusType: Thanos
+
+  # Alertmanager datasource (for Grafana alerting integration)
+  - name: Alertmanager
+    type: alertmanager
+    uid: alertmanager-main
+    orgId: 1
+    url: http://alertmanager:9093
+    access: proxy
+    editable: false
+    jsonData:
+      implementation: prometheus

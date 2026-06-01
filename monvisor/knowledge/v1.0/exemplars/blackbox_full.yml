@@ -1,0 +1,173 @@
+# blackbox_full.yml — Complete blackbox_exporter module configuration reference
+# Source: https://github.com/prometheus/blackbox_exporter
+# Covers all prober types: http, tcp, icmp, dns, websocket
+
+modules:
+
+  # ── HTTP probers ───────────────────────────────────────────────────────────
+
+  # Standard HTTP 2xx check
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: []         # defaults to 2xx
+      method: GET
+      follow_redirects: true
+      fail_if_ssl: false
+      fail_if_not_ssl: false
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: true
+
+  # HTTPS-only check (fails if not SSL)
+  https_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: []
+      method: GET
+      fail_if_not_ssl: true
+      tls_config:
+        insecure_skip_verify: false
+      preferred_ip_protocol: ip4
+
+  # HTTP POST with JSON body
+  http_post_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      method: POST
+      headers:
+        Content-Type: application/json
+      body: '{"ping": "prom"}'
+      valid_status_codes: [200, 201, 204]
+
+  # HTTP with basic auth
+  http_basic_auth:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      basic_auth:
+        username: healthcheck
+        password: CHANGEME
+
+  # HTTP with custom CA (internal PKI)
+  http_custom_ca:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      tls_config:
+        ca_file: /etc/blackbox_exporter/internal-ca.pem
+        insecure_skip_verify: false
+
+  # HTTP with OAuth2
+  http_oauth2:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      oauth2:
+        client_id: blackbox-prober
+        client_secret: CHANGEME
+        token_url: https://auth.example.com/oauth2/token
+        scopes:
+          - api:read
+
+  # HTTP body content validation
+  http_body_check:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      fail_if_body_matches_regexp:
+        - "error"
+        - "exception"
+        - "Could not connect to database"
+      fail_if_body_not_matches_regexp:
+        - "status.*ok"
+
+  # ── TCP probers ─────────────────────────────────────────────────────────────
+
+  # Plain TCP connect
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+
+  # TCP with TLS
+  tcp_tls:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      tls: true
+      tls_config:
+        insecure_skip_verify: false
+        ca_file: /etc/blackbox_exporter/ca.pem
+
+  # SMTP STARTTLS check
+  smtp_starttls:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      query_response:
+        - expect: "^220 "
+        - send: "EHLO prober\r"
+        - expect: "^250-STARTTLS"
+        - send: "STARTTLS\r"
+        - expect: "^220"
+        - starttls: true
+        - send: "EHLO prober\r"
+        - expect: "^250-AUTH"
+        - send: "QUIT\r"
+
+  # ── ICMP probers ────────────────────────────────────────────────────────────
+
+  icmp:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: true
+
+  icmp_ttl5:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: ip4
+      ttl: 5
+
+  # ── DNS probers ─────────────────────────────────────────────────────────────
+
+  # DNS A record lookup
+  dns_udp:
+    prober: dns
+    timeout: 5s
+    dns:
+      query_name: prometheus.io
+      query_type: A
+      valid_rcodes:
+        - NOERROR
+      preferred_ip_protocol: ip4
+
+  # DNS over TCP
+  dns_tcp:
+    prober: dns
+    timeout: 5s
+    dns:
+      transport_protocol: tcp
+      query_name: prometheus.io
+      query_type: A
+      preferred_ip_protocol: ip4
+
+  # DNS SOA check
+  dns_soa:
+    prober: dns
+    timeout: 5s
+    dns:
+      query_name: example.com
+      query_type: SOA
+      valid_rcodes:
+        - NOERROR

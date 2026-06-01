@@ -1,0 +1,49 @@
+:root{
+  --bg:#0f1419; --panel:#1a1f29; --line:#2a3140; --fg:#e6e9ef;
+  --muted:#7a869a; --cyan:#39c5cf; --green:#3fb950; --red:#f85149; --amber:#d29922;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}
+body.centered{display:flex;align-items:center;justify-content:center;min-height:100vh}
+a{color:var(--cyan);text-decoration:none}
+code{background:#161b22;padding:1px 6px;border-radius:4px;color:var(--cyan)}
+.brand{font-size:20px;font-weight:700;color:var(--fg)}
+.brand span{color:var(--cyan)}
+.muted{color:var(--muted)}
+.accent{color:var(--cyan)}
+.bold{font-weight:600}
+.ok{color:var(--green)}
+.warn{color:var(--amber)}
+.num{font-variant-numeric:tabular-nums;color:var(--muted)}
+.error{color:var(--red);margin:0 0 8px}
+
+.topbar{display:flex;justify-content:space-between;align-items:center;
+  padding:16px 28px;border-bottom:1px solid var(--line)}
+.topbar nav a{margin-left:18px}
+main{padding:24px 28px;max-width:1000px}
+h2{margin:0 0 16px}
+.rowhead{display:flex;justify-content:space-between;align-items:center}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:28px}
+.login{display:flex;flex-direction:column;gap:14px;width:300px;text-align:center}
+.login input{padding:10px 12px;border:1px solid var(--line);border-radius:6px;
+  background:var(--bg);color:var(--fg)}
+
+.btn{background:var(--cyan);color:#06222b;border:none;border-radius:6px;
+  padding:9px 16px;font-weight:600;cursor:pointer}
+.btn.sm{padding:5px 12px;font-size:13px}
+.btn:hover{filter:brightness(1.08)}
+button{font-family:inherit}
+
+table.grid{width:100%;border-collapse:collapse;background:var(--panel);
+  border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-top:8px}
+.grid th,.grid td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line)}
+.grid th{background:#161b22;color:var(--muted);font-size:11px;
+  text-transform:uppercase;letter-spacing:.04em}
+
+.toggle{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.toggle button{background:transparent;color:var(--muted);border:none;
+  padding:5px 14px;cursor:pointer}
+.toggle .t-yes.on{background:rgba(63,185,80,.18);color:var(--green)}
+.toggle .t-no.on{background:rgba(248,81,73,.18);color:var(--red)}

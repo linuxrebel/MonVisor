@@ -1,0 +1,273 @@
+# rules_full.yml — Complete Prometheus alerting and recording rules reference
+# Prometheus v3.12.0
+# Covers: infrastructure, HTTP/application, database, blackbox/probe,
+#         Kubernetes, recording rules, watchdog
+
+groups:
+
+  # ── Recording rules ────────────────────────────────────────────────────────
+  - name: recording:node
+    interval: 1m
+    rules:
+      - record: instance:node_cpu_utilization:rate5m
+        expr: |
+          1 - avg by (instance, job) (
+            rate(node_cpu_seconds_total{mode="idle"}[5m])
+          )
+
+      - record: instance:node_memory_utilization:ratio
+        expr: |
+          1 - (
+            node_memory_MemAvailable_bytes
+            / node_memory_MemTotal_bytes
+          )
+
+      - record: instance:node_filesystem_utilization:ratio
+        expr: |
+          1 - (
+            node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs"}
+            / node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs"}
+          )
+
+      - record: instance:node_network_receive_bytes:rate5m
+        expr: sum by (instance) (rate(node_network_receive_bytes_total[5m]))
+
+      - record: instance:node_network_transmit_bytes:rate5m
+        expr: sum by (instance) (rate(node_network_transmit_bytes_total[5m]))
+
+  - name: recording:http
+    interval: 1m
+    rules:
+      - record: job:http_requests_total:rate5m
+        expr: sum by (job) (rate(http_requests_total[5m]))
+
+      - record: job:http_request_errors_total:rate5m
+        expr: sum by (job) (rate(http_requests_total{status_code=~"5.."}[5m]))
+
+      - record: job:http_request_error_ratio:rate5m
+        expr: |
+          job:http_request_errors_total:rate5m
+          / job:http_requests_total:rate5m
+
+  # ── Node / Infrastructure alerts ───────────────────────────────────────────
+  - name: alerts:node
+    rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+          team: ops
+        annotations:
+          summary: "Instance {{ $labels.instance }} is down"
+          description: "{{ $labels.instance }} (job={{ $labels.job }}) has been down for more than 5 minutes."
+          runbook: "https://wiki.example.com/runbooks/instance-down"
+
+      - alert: NodeHighCPU
+        expr: instance:node_cpu_utilization:rate5m > 0.90
+        for: 15m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "High CPU on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | humanizePercentage }} on {{ $labels.instance }} for 15+ minutes."
+
+      - alert: NodeCPUCritical
+        expr: instance:node_cpu_utilization:rate5m > 0.98
+        for: 5m
+        labels:
+          severity: critical
+          team: ops
+        annotations:
+          summary: "Critical CPU on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}."
+
+      - alert: NodeLowMemory
+        expr: instance:node_memory_utilization:ratio > 0.90
+        for: 10m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}."
+
+      - alert: NodeMemoryCritical
+        expr: instance:node_memory_utilization:ratio > 0.97
+        for: 5m
+        labels:
+          severity: critical
+          team: ops
+        annotations:
+          summary: "Critical memory on {{ $labels.instance }}"
+
+      - alert: NodeFilesystemAlmostFull
+        expr: instance:node_filesystem_utilization:ratio > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "Filesystem almost full on {{ $labels.instance }}"
+          description: "{{ $labels.mountpoint }} on {{ $labels.instance }} is {{ $value | humanizePercentage }} full."
+
+      - alert: NodeFilesystemFull
+        expr: instance:node_filesystem_utilization:ratio > 0.95
+        for: 5m
+        labels:
+          severity: critical
+          team: ops
+        annotations:
+          summary: "Filesystem critical on {{ $labels.instance }}"
+          description: "{{ $labels.mountpoint }} on {{ $labels.instance }} is {{ $value | humanizePercentage }} full."
+
+      - alert: NodeFilesystemPredictedFull
+        expr: predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs"}[1h], 4 * 3600) < 0
+        for: 10m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "Disk filling soon on {{ $labels.instance }}"
+          description: "{{ $labels.mountpoint }} on {{ $labels.instance }} will be full within 4 hours at current rate."
+
+      - alert: NodeHighLoad
+        expr: node_load15 / count without(cpu, mode) (node_cpu_seconds_total{mode="idle"}) > 2
+        for: 15m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "High load average on {{ $labels.instance }}"
+          description: "15-minute load average is {{ $value | humanize }}x CPU count."
+
+      - alert: NodeClockSkew
+        expr: abs(node_timex_offset_seconds) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "Clock skew on {{ $labels.instance }}"
+          description: "Clock offset is {{ $value | humanizeDuration }} from NTP."
+
+  # ── HTTP / Application alerts ──────────────────────────────────────────────
+  - name: alerts:http
+    rules:
+      - alert: HighHTTPErrorRate
+        expr: job:http_request_error_ratio:rate5m > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: app
+        annotations:
+          summary: "High HTTP error rate for {{ $labels.job }}"
+          description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.job }}."
+
+      - alert: HighHTTPLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum by (job, le) (rate(http_request_duration_seconds_bucket[5m]))
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: app
+        annotations:
+          summary: "High p99 latency for {{ $labels.job }}"
+          description: "p99 latency is {{ $value | humanizeDuration }} for {{ $labels.job }}."
+
+  # ── Database alerts ────────────────────────────────────────────────────────
+  - name: alerts:database
+    rules:
+      - alert: MySQLDown
+        expr: mysql_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: dba
+        annotations:
+          summary: "MySQL down on {{ $labels.instance }}"
+
+      - alert: MySQLHighConnections
+        expr: |
+          mysql_global_status_threads_connected
+          / mysql_global_variables_max_connections > 0.80
+        for: 5m
+        labels:
+          severity: warning
+          team: dba
+        annotations:
+          summary: "MySQL connections at {{ $value | humanizePercentage }} of max on {{ $labels.instance }}"
+
+      - alert: PostgreSQLDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: dba
+        annotations:
+          summary: "PostgreSQL down on {{ $labels.instance }}"
+
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: dba
+        annotations:
+          summary: "Redis down on {{ $labels.instance }}"
+
+  # ── Blackbox / probe alerts ────────────────────────────────────────────────
+  - name: alerts:probe
+    rules:
+      - alert: ProbeDown
+        expr: probe_success == 0
+        for: 5m
+        labels:
+          severity: critical
+          team: ops
+        annotations:
+          summary: "Probe failed for {{ $labels.instance }}"
+          description: "Endpoint {{ $labels.instance }} has been unreachable for 5+ minutes."
+
+      - alert: ProbeSlowHTTP
+        expr: probe_http_duration_seconds > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "Slow HTTP probe for {{ $labels.instance }}"
+          description: "HTTP probe taking {{ $value | humanizeDuration }} for {{ $labels.instance }}."
+
+      - alert: SSLCertExpiringSoon
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 30
+        for: 1h
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "SSL cert expiring soon for {{ $labels.instance }}"
+          description: "SSL certificate expires in {{ $value | humanizeDuration }}."
+
+      - alert: SSLCertExpiryCritical
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 7
+        for: 1h
+        labels:
+          severity: critical
+          team: ops
+        annotations:
+          summary: "SSL cert expiring within 7 days for {{ $labels.instance }}"
+
+  # ── Watchdog ──────────────────────────────────────────────────────────────
+  - name: alerts:watchdog
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+        annotations:
+          summary: "Alerting pipeline alive"
+          description: "This alert always fires to confirm end-to-end alerting is functional."
