@@ -257,13 +257,20 @@ def ensure_models(skip_models, ollama_mode):
 # ── locate the wheel ─────────────────────────────────────────────────────────
 
 def find_local_wheel():
-    """Look for a built wheel next to this script's repo (../dist/)."""
+    """Find a built wheel near the script: alongside install.py, in the current
+    directory, or in a dist/ folder under either. Covers both the 'copied
+    install.py + wheel into one dir' case and the 'ran from a clone' case."""
     here = Path(__file__).resolve().parent
-    for cand in (here.parent / "dist", Path.cwd() / "dist"):
-        if cand.is_dir():
-            wheels = sorted(cand.glob("monvisor-*-py3-none-any.whl"))
-            if wheels:
-                return wheels[-1]
+    cwd = Path.cwd()
+    search_dirs = [here, cwd, here / "dist", cwd / "dist", here.parent / "dist"]
+    seen = set()
+    for d in search_dirs:
+        if d in seen or not d.is_dir():
+            continue
+        seen.add(d)
+        wheels = sorted(d.glob("monvisor-*-py3-none-any.whl"))
+        if wheels:
+            return wheels[-1]
     return None
 
 
@@ -286,16 +293,18 @@ def resolve_wheel(explicit, work_dir):
         if not p.exists():
             die(f"--wheel path not found: {p}")
         return p
-    # Prefer GitHub release; fall back to a locally built wheel.
+    # Prefer a local wheel (offline-friendly, and what you get when you copy the
+    # wheel next to install.py or run from a clone). Only reach for GitHub if no
+    # local wheel is found.
+    local = find_local_wheel()
+    if local:
+        say(f"  Using local wheel: {local}")
+        return local
     dl = download_release(work_dir)
     if dl:
         return dl
-    local = find_local_wheel()
-    if local:
-        say(f"  Falling back to local wheel: {local}")
-        return local
-    die("No wheel found. Build one with `python -m build`, or pass --wheel PATH, "
-        f"or publish the v{VERSION} GitHub release.")
+    die("No wheel found. Put the wheel next to install.py, build one with "
+        f"`python -m build`, pass --wheel PATH, or publish the v{VERSION} GitHub release.")
 
 
 # ── venv install ─────────────────────────────────────────────────────────────
