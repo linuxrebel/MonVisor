@@ -312,8 +312,12 @@ Remote detection: SSH tunnel instructions auto-printed when no display detected
   (Earlier mistakenly flagged as nonexistent; verified in Ollama registry, 9.6GB.)
 
   *** RELEASE STATE AT END OF 2026-06-02 SESSION ***
-  - Local HEAD: 573af0e (RELEASE.md realign-tag note). 9 commits AHEAD of origin.
-  - Local tag v0.1.0 realigned onto 573af0e (was stale on 360a432 / obj 3ad774d).
+  - Local HEAD: d4dcbb4 (this PROJECT_STATE update; 573af0e was the prior tip
+    with RELEASE.md). ~10 commits AHEAD of origin.
+  - Local tag v0.1.0 was realigned onto 573af0e during the session. Because this
+    doc commit (d4dcbb4) is now the tip, EITHER move the tag to d4dcbb4 before
+    releasing (git tag -d v0.1.0 && git tag -a v0.1.0 -m "MonVisor 0.1.0"), or
+    accept v0.1.0 on 573af0e (the docs are the only diff — harmless either way).
   - dist/ has FRESH built artifacts: monvisor-0.1.0-py3-none-any.whl (+ .tar.gz),
     wheel verified to contain 231-pair corpus.
   - origin/main is STALE at 747d149. Remote tag v0.1.0 still on old commit.
