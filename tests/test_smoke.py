@@ -74,6 +74,28 @@ class TestCliWiring(unittest.TestCase):
         self.assertGreater(main._ASK_MAX_DISTANCE, 0.30)
         self.assertLess(main._ASK_MAX_DISTANCE, 0.46)
 
+    def test_init_has_reset_knowledge_flag(self):
+        from monvisor.cli.main import init
+        opts = [p.name for p in init.params]
+        self.assertIn("reset_knowledge", opts)
+
+
+class TestIngestReplaceContract(unittest.TestCase):
+    """Guard the knowledge-reset bug: ingest must expose a replace path and a
+    store-level reset primitive, so re-ingesting a different corpus cannot
+    orphan the previous one."""
+
+    def test_ingest_signatures_accept_replace(self):
+        import inspect
+        from monvisor.rag import ingest
+        for fn in (ingest.ingest_corpus, ingest.ingest_exemplars):
+            self.assertIn("replace", inspect.signature(fn).parameters,
+                          f"{fn.__name__} missing 'replace' param")
+
+    def test_reset_collection_exists(self):
+        from monvisor.rag import store
+        self.assertTrue(callable(getattr(store, "reset_collection", None)))
+
 
 class TestConfigSanity(unittest.TestCase):
     def test_fingerprints_well_formed(self):

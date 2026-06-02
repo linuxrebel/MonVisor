@@ -102,15 +102,15 @@ def run_knowledge_update(package_path: str) -> None:
 
         corpus = root / "corpus.jsonl"
         if corpus.exists():
-            n = ingest_corpus(corpus)
-            console.print(f"  [green]\u2713[/green] Ingested {n} corpus pairs")
+            n = ingest_corpus(corpus, replace=True)
+            console.print(f"  [green]\u2713[/green] Ingested {n} corpus pairs (replaced previous)")
         else:
             console.print("  [dim]No corpus.jsonl in package \u2014 skipping pairs.[/dim]")
 
         exemplars = root / "exemplars"
         if exemplars.is_dir():
-            n = ingest_exemplars(exemplars)
-            console.print(f"  [green]\u2713[/green] Ingested {n} exemplar chunks")
+            n = ingest_exemplars(exemplars, replace=True)
+            console.print(f"  [green]\u2713[/green] Ingested {n} exemplar chunks (replaced previous)")
         else:
             console.print("  [dim]No exemplars/ in package \u2014 skipping.[/dim]")
 

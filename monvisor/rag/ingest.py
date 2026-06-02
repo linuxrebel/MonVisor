@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 
-from monvisor.rag.store import get_or_create_collection
+from monvisor.rag.store import get_or_create_collection, reset_collection
 from monvisor.rag.embed import embed
 from monvisor.config import CORPUS_SOURCE, EXEMPLARS_SOURCE
 
@@ -39,9 +39,11 @@ def _chunk_text(text: str, max_chars: int = MAX_CHUNK_CHARS) -> List[str]:
     return [c for c in chunks if c]
 
 
-def ingest_corpus(corpus_path: Path = None) -> int:
+def ingest_corpus(corpus_path: Path = None, replace: bool = False) -> int:
     """
     Ingest the JSONL corpus pairs into ChromaDB 'pairs' collection.
+    If replace=True, the collection is reset first so the store reflects
+    exactly this corpus (no orphaned docs from a previous, different corpus).
     Returns number of documents ingested.
     """
     corpus_path = corpus_path or CORPUS_SOURCE
@@ -61,7 +63,7 @@ def ingest_corpus(corpus_path: Path = None) -> int:
     if not pairs:
         return 0
 
-    collection = get_or_create_collection("pairs")
+    collection = reset_collection("pairs") if replace else get_or_create_collection("pairs")
 
     docs, ids, metas = [], [], []
     for pair in pairs:
@@ -102,17 +104,18 @@ def ingest_corpus(corpus_path: Path = None) -> int:
     return len(docs)
 
 
-def ingest_exemplars(exemplars_path: Path = None) -> int:
+def ingest_exemplars(exemplars_path: Path = None, replace: bool = False) -> int:
     """
     Ingest annotated reference config files into ChromaDB 'exemplars' collection.
     Long files are chunked to stay within nomic-embed-text context limit.
+    If replace=True, the collection is reset first.
     Returns number of chunks ingested.
     """
     exemplars_path = exemplars_path or EXEMPLARS_SOURCE
     if not exemplars_path.exists():
         raise FileNotFoundError(f"Exemplars path not found: {exemplars_path}")
 
-    collection = get_or_create_collection("exemplars")
+    collection = reset_collection("exemplars") if replace else get_or_create_collection("exemplars")
 
     docs, ids, metas = [], [], []
 

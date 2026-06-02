@@ -83,7 +83,9 @@ def cli():
 # ── Init ──────────────────────────────────────────────────────────────────────
 
 @cli.command()
-def init():
+@click.option("--reset-knowledge", is_flag=True,
+              help="Force a clean reload of the knowledge base (drops any existing store).")
+def init(reset_knowledge):
     """First-run setup: create data directories, load knowledge base, set password."""
     from monvisor.config import (ensure_dirs, MONVISOR_HOME, DB_PATH,
                                   CORPUS_SOURCE, EXEMPLARS_SOURCE)
@@ -136,17 +138,27 @@ def init():
 
     # 4. Load knowledge base
     console.print("  Loading knowledge base into RAG store...")
+    # Reset existing collections before ingest so a re-run (or a different
+    # bundled corpus) replaces the store cleanly instead of layering new docs
+    # on top of orphaned ones. A first run has nothing to reset, so this is safe.
+    existing = verify_rag()
+    do_replace = reset_knowledge or existing["pairs"] > 0 or existing["exemplars"] > 0
+    if do_replace and (existing["pairs"] or existing["exemplars"]):
+        console.print(
+            f"  [dim]Existing store ({existing['pairs']} pairs, "
+            f"{existing['exemplars']} exemplars) will be replaced.[/dim]"
+        )
     try:
         if not CORPUS_SOURCE.exists():
             console.print(f"  [yellow]⚠[/yellow]  Corpus not found at {CORPUS_SOURCE}")
         else:
-            n_pairs = ingest_corpus()
+            n_pairs = ingest_corpus(replace=do_replace)
             console.print(f"  [green]✓[/green] Ingested {n_pairs} corpus pairs")
 
         if not EXEMPLARS_SOURCE.exists():
             console.print(f"  [yellow]⚠[/yellow]  Exemplars not found at {EXEMPLARS_SOURCE}")
         else:
-            n_exemplars = ingest_exemplars()
+            n_exemplars = ingest_exemplars(replace=do_replace)
             console.print(f"  [green]✓[/green] Ingested {n_exemplars} exemplar configs")
 
         counts = verify_rag()
