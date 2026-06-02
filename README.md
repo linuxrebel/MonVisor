@@ -138,6 +138,17 @@ monvisor knowledge status       # should report 231 pairs loaded
 monvisor ask "How do I run a scan?"
 ```
 
+To run `monvisor` from any shell without activating the venv each time, add an
+alias to `~/.bashrc` (or `~/.zshrc`):
+
+```bash
+alias monvisor="$HOME/.venvs/monvisor/bin/monvisor"
+```
+
+This is preferable to auto-activating the venv on login, which would also change
+which `python`/`pip` the rest of your shell uses. See [INSTALL.md](INSTALL.md)
+for details.
+
 ## Quick start
 
 After `monvisor init` (see Install above):

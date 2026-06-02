@@ -138,6 +138,29 @@ If `ask` returns a real answer (not "I've not yet learned how to do that"), the
 knowledge base is loaded and you're ready. See `README.md` for the scan →
 review → generate workflow.
 
+## Running `monvisor` without activating the venv (optional)
+
+By default you activate the environment each session
+(`source ~/.venvs/monvisor/bin/activate`). If you'd rather just type `monvisor`
+from any shell, add an alias to your shell startup file.
+
+Bash — add to `~/.bashrc`:
+
+```bash
+alias monvisor="$HOME/.venvs/monvisor/bin/monvisor"
+```
+
+Zsh — add to `~/.zshrc` (same line). Then reload: `source ~/.bashrc`
+(or open a new terminal).
+
+This runs MonVisor's binary directly from the venv, so the command works
+without activating — and, unlike auto-activating the venv on login, it does
+**not** change which `python`/`pip` your shell uses for everything else. (If you
+installed to a custom `--venv` location, point the alias there instead.)
+
+If you prefer no alias, you can always call the binary by full path:
+`~/.venvs/monvisor/bin/monvisor`.
+
 ## Troubleshooting
 
 **`ask` says "I've not yet learned how to do that" / `knowledge status` shows 0
