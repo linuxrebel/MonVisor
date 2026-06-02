@@ -211,4 +211,9 @@ python -m build        # build sdist + wheel into dist/
 
 ## License
 
-GNU General Public License v3.0 or later (GPL-3.0-or-later) — see [LICENSE](LICENSE).
+MonVisor (the application) is licensed under the GNU General Public License
+v3.0 or later (GPL-3.0-or-later) — see [LICENSE](LICENSE).
+
+The bundled knowledge base (`monvisor/knowledge/`) comes from the separate
+[MonVisor-Corpus](https://github.com/linuxrebel/MonVisor-Corpus) project and is
+licensed CC BY-SA 4.0. The two licenses apply to their respective parts.
