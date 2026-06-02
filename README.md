@@ -32,22 +32,87 @@ scan  ──▶  review  ──▶  generate  ──▶  (deploy: paid)
 
 ## Install
 
+MonVisor is a Python package. The full install is three parts: system tools,
+a running Ollama with two models, then the package itself.
+
+### 1. System prerequisites
+
 ```bash
-# from a clone
+# Fedora / RHEL
+sudo dnf install python3 python3-pip nmap
+
+# Debian / Ubuntu
+sudo apt install python3 python3-pip python3-venv nmap
+```
+
+`nmap` must be on your `PATH` — scanning depends on it. Python 3.11+ is required.
+
+### 2. Ollama + models (required before `monvisor init`)
+
+`init`, `ask`, and `generate` all use a local Ollama instance, and `init`
+builds embeddings from the bundled knowledge, so the models must be pulled
+*before* you initialize.
+
+```bash
+# install Ollama: https://ollama.com/download  (or: curl -fsSL https://ollama.com/install.sh | sh)
+ollama serve &                 # start the server if it isn't already running
+
+ollama pull gemma4             # the LLM (default model)
+ollama pull nomic-embed-text   # the embedding model — REQUIRED, init fails without it
+```
+
+Ollama listens on `http://localhost:11434` by default. Point MonVisor elsewhere
+with `MONVISOR_OLLAMA_URL` or `monvisor config set ollama-url <url>`.
+
+### 3. Install MonVisor
+
+Use a virtual environment to keep dependencies isolated:
+
+```bash
+python3 -m venv ~/.venvs/monvisor
+source ~/.venvs/monvisor/bin/activate
+
+# from a release wheel (recommended)
+pip install monvisor-0.1.0-py3-none-any.whl
+
+# or from the sdist
+pip install monvisor-0.1.0.tar.gz
+
+# or from a source clone
 pip install .
 
 # or editable, for development
 pip install -e .
 ```
 
-The knowledge base (RAG corpus + reference configs) ships inside the package,
-so `monvisor init` is self-contained. Developers can point at an external corpus
-with `MONVISOR_CORPUS` / `MONVISOR_EXEMPLARS`.
+This installs the `monvisor` command. The knowledge base (RAG corpus + reference
+configs) ships *inside* the package, so there is nothing else to download —
+`monvisor init` is fully self-contained. (Developers can override the corpus
+with `MONVISOR_CORPUS` / `MONVISOR_EXEMPLARS`.)
+
+### 4. Initialize
+
+```bash
+monvisor init
+```
+
+This creates `~/.monvisor/` (database, vector store, reports, configs), loads
+the bundled knowledge into the RAG store (embedding takes a minute), and sets a
+password for the web UI. Re-running `init` cleanly reloads the knowledge;
+`monvisor init --reset-knowledge` forces a fresh rebuild.
+
+Verify it worked:
+
+```bash
+monvisor knowledge status       # should report 231 pairs loaded
+monvisor ask "How do I run a scan?"
+```
 
 ## Quick start
 
+After `monvisor init` (see Install above):
+
 ```bash
-monvisor init                          # create ~/.monvisor, load knowledge, set password
 monvisor env add prod 192.168.1.0/24   # register a network as 'prod'
 monvisor scan prod                     # discover + fingerprint services
 monvisor review prod                   # approve services to monitor (y/b/n/s/a/q)
