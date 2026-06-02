@@ -138,6 +138,10 @@ If `ask` returns a real answer (not "I've not yet learned how to do that"), the
 knowledge base is loaded and you're ready. See `README.md` for the scan →
 review → generate workflow.
 
+To leave the virtual environment, run `deactivate`. Closing the terminal also
+ends it. (`deactivate` just returns your shell to normal; it does not stop or
+uninstall MonVisor.)
+
 ## Running `monvisor` without activating the venv (optional)
 
 By default you activate the environment each session

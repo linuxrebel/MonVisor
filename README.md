@@ -138,6 +138,9 @@ monvisor knowledge status       # should report 231 pairs loaded
 monvisor ask "How do I run a scan?"
 ```
 
+To leave the activated environment, run `deactivate` (or just close the
+terminal).
+
 To run `monvisor` from any shell without activating the venv each time, add an
 alias to `~/.bashrc` (or `~/.zshrc`):
 
