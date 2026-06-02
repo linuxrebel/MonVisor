@@ -148,6 +148,7 @@ def init(reset_knowledge):
             f"  [dim]Existing store ({existing['pairs']} pairs, "
             f"{existing['exemplars']} exemplars) will be replaced.[/dim]"
         )
+    knowledge_ok = False
     try:
         if not CORPUS_SOURCE.exists():
             console.print(f"  [yellow]⚠[/yellow]  Corpus not found at {CORPUS_SOURCE}")
@@ -163,8 +164,16 @@ def init(reset_knowledge):
 
         counts = verify_rag()
         console.print(f"  [green]✓[/green] RAG store: {counts['pairs']} pairs, {counts['exemplars']} exemplars")
+        knowledge_ok = counts["pairs"] > 0
     except Exception as e:
         console.print(f"  [red]✗[/red]  RAG ingest failed: {e}")
+        from monvisor.config import OLLAMA_EMBED_MODEL as _embed
+        console.print(
+            "  [yellow]This usually means Ollama isn't running or the embedding "
+            f"model is missing.[/yellow]\n"
+            f"  [dim]Start Ollama, run 'ollama pull {_embed}', "
+            "then 'monvisor init --reset-knowledge'.[/dim]"
+        )
 
     # 5. Set password
     console.print()
@@ -178,16 +187,30 @@ def init(reset_knowledge):
 
     # 6. Done
     console.print()
-    console.print(Panel(
-        "[bold green]MonVisor initialized successfully.[/bold green]\n\n"
-        "Next steps:\n"
-        "  monvisor env add prod 192.168.1.0/24\n"
-        "  monvisor scan prod\n"
-        "  monvisor review prod\n"
-        "  monvisor generate prod\n"
-        "  monvisor nginx         (optional: reverse-proxy config)",
-        title="Ready", expand=False
-    ))
+    if knowledge_ok:
+        console.print(Panel(
+            "[bold green]MonVisor initialized successfully.[/bold green]\n\n"
+            "Next steps:\n"
+            "  monvisor env add prod 192.168.1.0/24\n"
+            "  monvisor scan prod\n"
+            "  monvisor review prod\n"
+            "  monvisor generate prod\n"
+            "  monvisor nginx         (optional: reverse-proxy config)",
+            title="Ready", expand=False
+        ))
+    else:
+        from monvisor.config import OLLAMA_EMBED_MODEL as _embed
+        console.print(Panel(
+            "[bold yellow]MonVisor set up, but the knowledge base is empty.[/bold yellow]\n\n"
+            "Directories, database, and password are ready, but no knowledge was\n"
+            "loaded — so 'monvisor ask' and 'generate' won't work yet. This means\n"
+            "Ollama wasn't reachable or the embedding model wasn't pulled.\n\n"
+            "Finish setup once Ollama is running:\n"
+            f"  ollama pull {_embed}\n"
+            "  monvisor init --reset-knowledge",
+            title="Incomplete", expand=False
+        ))
+        sys.exit(1)
 
 
 def _set_password():
