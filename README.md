@@ -24,27 +24,41 @@ scan  ──▶  review  ──▶  generate  ──▶  (deploy: paid)
 ## Requirements
 
 - Python 3.11+
-- [nmap](https://nmap.org/) on `PATH` (`sudo dnf install nmap`)
+- [nmap](https://nmap.org/) on `PATH` (service discovery)
+- `curl` and `zstd` (needed to install Ollama)
 - [Ollama](https://ollama.com/) running locally, with:
   - an LLM (default `gemma4:latest`)
   - the embedding model `nomic-embed-text:latest`
+- ~12–15 GB free disk for the models
 - `promtool` (optional) for config validation
 
 ## Install
 
-The fastest path is the bundled installer, which handles system packages,
-Ollama models, the virtualenv, and first-run init in one go:
+The fastest path is the bundled installer. It checks and installs the system
+prerequisites (nmap, curl, zstd, python venv), installs and starts Ollama and
+pulls the models, creates a virtualenv, installs MonVisor, and runs first-time
+setup — all in one go:
 
 ```bash
 python3 scripts/install.py
 ```
 
-Flags: `--no-sudo` (skip system packages), `--no-models` (skip pulling Ollama
-models), `--no-init` (install only), `--venv PATH`, `--wheel PATH`. It installs
-from the GitHub release wheel when available and falls back to a locally built
-`dist/` wheel otherwise.
+It installs MonVisor from the published GitHub release wheel when available. If
+there is no release yet (or you're working from a clone), build the wheel first
+so the installer has something local to fall back to:
 
-To do it by hand instead, follow the four steps below.
+```bash
+pip install build           # one-time, if not already present
+python3 -m build            # creates dist/monvisor-*.whl
+python3 scripts/install.py  # finds and installs the local dist/ wheel
+```
+
+Flags: `--no-sudo` (skip system packages), `--no-models` (skip pulling Ollama
+models), `--no-init` (install only), `--install-ollama` / `--no-install-ollama`
+(control the Ollama install prompt), `--venv PATH`, `--wheel PATH`.
+
+To do everything by hand instead, follow the four steps below. For a fuller
+walkthrough (every prerequisite, plus troubleshooting), see [INSTALL.md](INSTALL.md).
 
 MonVisor is a Python package. The full install is three parts: system tools,
 a running Ollama with two models, then the package itself.
@@ -53,13 +67,15 @@ a running Ollama with two models, then the package itself.
 
 ```bash
 # Fedora / RHEL
-sudo dnf install python3 python3-pip nmap
+sudo dnf install python3 python3-pip nmap curl zstd
 
 # Debian / Ubuntu
-sudo apt install python3 python3-pip python3-venv nmap
+sudo apt install python3 python3-pip python3-venv nmap curl zstd
 ```
 
-`nmap` must be on your `PATH` — scanning depends on it. Python 3.11+ is required.
+`nmap` must be on your `PATH` (scanning depends on it). `curl` and `zstd` are
+needed to install Ollama in the next step — the Ollama installer is
+zstd-compressed and fails without it. Python 3.11+ is required.
 
 ### 2. Ollama + models (required before `monvisor init`)
 
