@@ -1,12 +1,12 @@
 {
   "version": "1.0",
   "min_monvisor": "0.1.0",
-  "changelog": "Initial bundled knowledge base: 174 instruction/response pairs (Prometheus, Alertmanager, Grafana, exporters, integration) plus 14 annotated exemplar configs.",
+  "changelog": "Initial bundled knowledge base: 231 instruction/response pairs (Prometheus, Alertmanager, Grafana, exporters, integration, plus 57 MonVisor self-knowledge pairs) and 14 annotated exemplar configs.",
   "prometheus_version": "3.12.0",
   "alertmanager_version": "0.32.1",
   "grafana_version": "13.0.1",
   "corpus": "corpus.jsonl",
-  "pairs": 174,
+  "pairs": 231,
   "exemplars_dir": "exemplars",
   "source": "MonVisor-Corpus (official docs + official upstream repositories only)",
   "build_date": "2026-06-01"
