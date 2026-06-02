@@ -53,6 +53,11 @@ def cli():
       generate <env>             RAG + Ollama → prometheus/rules/alert YAML
 
     \b
+    ASK
+      ask "<question>"           Ask the AI about MonVisor or monitoring,
+                                 answered from the local knowledge base
+
+    \b
     DEPLOY (paid tier)
       deploy <env>               SSH push + promtool validate + reload    [Phase 5]
 
@@ -424,6 +429,89 @@ def nginx(environment, print_only):
     """Generate the nginx reverse-proxy config (Grafana + MonVisor UI)."""
     from monvisor.cli.nginx import emit_nginx_config
     emit_nginx_config(environment, offer_write=not print_only)
+
+
+# ── Ask (RAG Q&A) ───────────────────────────────────────────────────────────
+
+# Distance above which the nearest knowledge is considered unrelated. Calibrated
+# against nomic-embed-text cosine distances: in-domain questions land ~0.17-0.30,
+# clearly out-of-domain ~0.46+. A model-side sentinel is the authoritative gate;
+# this is just a cheap pre-filter to skip the LLM call on obvious misses.
+_ASK_MAX_DISTANCE = 0.40
+_ASK_FALLBACK = (
+    "I've not yet learned how to do that.\n\n"
+    "If this is something MonVisor should know, please file it so it can be added:\n"
+    "  https://github.com/linuxrebel/MonVisor/issues"
+)
+
+
+@cli.command()
+@click.argument("question")
+@click.option("--show-sources", is_flag=True, help="Also print the knowledge snippets used.")
+def ask(question, show_sources):
+    """Ask the MonVisor AI a question, answered from its local knowledge base.
+
+    \b
+    Examples:
+      monvisor ask "How do I run a scan?"
+      monvisor ask "show me a node_exporter scrape config"
+
+    Answers come only from MonVisor's local knowledge (no internet). If the
+    knowledge base doesn't cover the question, MonVisor says so and points you
+    to the issue tracker rather than guessing.
+    """
+    from monvisor import config
+    from monvisor.rag.query import retrieve, build_context
+
+    # Layer 1 — cheap distance pre-filter. If nothing retrieved, or the nearest
+    # match is clearly unrelated, don't even call the model.
+    try:
+        hits = retrieve(question, "pairs", n_results=1)
+    except Exception as e:
+        console.print(f"[red]Knowledge base unavailable:[/red] {e}")
+        console.print("Have you run [bold]monvisor init[/bold] yet?")
+        sys.exit(1)
+
+    if not hits or hits[0]["distance"] > _ASK_MAX_DISTANCE:
+        console.print(_ASK_FALLBACK)
+        return
+
+    # Layer 2 — retrieve full context and let the model judge sufficiency.
+    context = build_context(question, n_pairs=4, n_exemplars=2)
+    prompt = (
+        "You are MonVisor's built-in assistant. Answer the user's question using "
+        "ONLY the knowledge provided below. Do not use outside knowledge or guess.\n"
+        "If the knowledge below does not actually answer the question, reply with "
+        "exactly this token and nothing else: INSUFFICIENT_CONTEXT\n\n"
+        f"=== KNOWLEDGE ===\n{context}\n=== END KNOWLEDGE ===\n\n"
+        f"Question: {question}\n\nAnswer:"
+    )
+
+    try:
+        import ollama
+        client = ollama.Client(host=config.OLLAMA_URL)
+        resp = client.chat(
+            model=config.OLLAMA_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        answer = (resp["message"]["content"] if isinstance(resp, dict)
+                  else resp.message.content).strip()
+    except Exception as e:
+        console.print(f"[red]Could not reach the local model:[/red] {e}")
+        console.print(f"Check that Ollama is running at {config.OLLAMA_URL}.")
+        sys.exit(1)
+
+    if "INSUFFICIENT_CONTEXT" in answer or not answer:
+        console.print(_ASK_FALLBACK)
+        return
+
+    console.print(answer)
+
+    if show_sources:
+        console.print("\n[dim]── sources ──[/dim]")
+        for h in retrieve(question, "pairs", n_results=4):
+            instr = h["metadata"].get("instruction", "")[:80]
+            console.print(f"[dim]• ({h['distance']:.2f}) {instr}[/dim]")
 
 
 if __name__ == "__main__":

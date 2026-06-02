@@ -57,8 +57,22 @@ class TestCliWiring(unittest.TestCase):
 
     def test_expected_commands_registered(self):
         for name in ("init", "scan", "review", "generate", "ui",
-                     "deploy", "nginx", "env", "config", "knowledge"):
+                     "deploy", "nginx", "env", "config", "knowledge", "ask"):
             self.assertIn(name, self.cli.commands, f"missing command: {name}")
+
+    def test_ask_help_runs(self):
+        result = self.runner.invoke(self.cli, ["ask", "--help"])
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("knowledge base", result.output)
+
+    def test_ask_fallback_message_well_formed(self):
+        from monvisor.cli import main
+        # Fallback must decline clearly and point to the issue tracker.
+        self.assertIn("not yet learned", main._ASK_FALLBACK.lower())
+        self.assertIn("github.com/linuxrebel/MonVisor/issues", main._ASK_FALLBACK)
+        # Distance gate sits between in-domain (~0.3) and out-of-domain (~0.46).
+        self.assertGreater(main._ASK_MAX_DISTANCE, 0.30)
+        self.assertLess(main._ASK_MAX_DISTANCE, 0.46)
 
 
 class TestConfigSanity(unittest.TestCase):

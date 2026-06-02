@@ -58,6 +58,21 @@ monvisor nginx prod                    # optional reverse-proxy config
 
 Outputs are written under `~/.monvisor/` (`reports/`, `configs/`).
 
+## Asking the AI
+
+MonVisor has a built-in assistant that answers from its local knowledge base —
+both how to use MonVisor and Prometheus/Alertmanager/Grafana questions:
+
+```bash
+monvisor ask "How do I run a scan?"
+monvisor ask "show me a node_exporter scrape config"
+monvisor ask "How do I report a bug?"
+```
+
+Answers come only from the bundled knowledge (no internet). If a question isn't
+covered, MonVisor says so and points you to the issue tracker rather than
+guessing. Add `--show-sources` to see which knowledge snippets were used.
+
 ## Configuration
 
 | Env var               | Purpose                                   | Default                  |
