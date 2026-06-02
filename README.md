@@ -32,6 +32,20 @@ scan  ──▶  review  ──▶  generate  ──▶  (deploy: paid)
 
 ## Install
 
+The fastest path is the bundled installer, which handles system packages,
+Ollama models, the virtualenv, and first-run init in one go:
+
+```bash
+python3 scripts/install.py
+```
+
+Flags: `--no-sudo` (skip system packages), `--no-models` (skip pulling Ollama
+models), `--no-init` (install only), `--venv PATH`, `--wheel PATH`. It installs
+from the GitHub release wheel when available and falls back to a locally built
+`dist/` wheel otherwise.
+
+To do it by hand instead, follow the four steps below.
+
 MonVisor is a Python package. The full install is three parts: system tools,
 a running Ollama with two models, then the package itself.
 
