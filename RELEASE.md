@@ -121,3 +121,28 @@ This exercises the real download path (release wheel, not the local fallback).
   `dist/`.
 - Corpus source lives in the separate `MonVisor-Corpus` repo and is re-bundled
   into `monvisor/knowledge/` before building. Keep that repo pushed too.
+
+
+## Realigning a stale or mismatched tag
+
+If `git tag` (or `gh release create`) reports the tag already exists, the tag is
+probably pointing at an older commit than what you mean to ship. As long as **no
+release has been published against it** (the asset URL still 404s) and nobody
+has pulled it, you can safely move it:
+
+```bash
+git push origin main                    # push the real release commit first
+git tag -d vX.Y.Z                        # delete stale local tag
+git push origin :refs/tags/vX.Y.Z        # delete stale remote tag
+git tag -a vX.Y.Z -m "MonVisor X.Y.Z"    # recreate on current HEAD
+git push origin vX.Y.Z
+git log --oneline -1 vX.Y.Z              # confirm it's the intended commit
+```
+
+Note: `git log <tag-object-sha>` shows the commit it wraps at the top, so an
+annotated tag's SHA and its commit's SHA differ while still pointing at the same
+commit — that is not a mismatch. A real mismatch is when the *commit* differs.
+
+**Do NOT move a tag once a release is published against it or others may have
+pulled it.** At that point, bump to the next patch version (e.g. X.Y.Z+1)
+instead — a published tag is immutable in practice.
