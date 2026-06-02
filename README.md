@@ -10,6 +10,8 @@ data leaves the host and there is no API cost.
 > Status: free-tier CLI is functional (discovery → review → generate → reports,
 > plus an optional web review UI and nginx config). Deploy/Grafana automation is
 > the paid tier and not yet implemented.
+>
+> **Latest release:** [v0.1.0](https://github.com/linuxrebel/MonVisor/releases/tag/v0.1.0) · [all releases](https://github.com/linuxrebel/MonVisor/releases)
 
 ## How it works
 
@@ -33,6 +35,20 @@ scan  ──▶  review  ──▶  generate  ──▶  (deploy: paid)
 - `promtool` (optional) for config validation
 
 ## Install
+
+**Latest release: [v0.1.0](https://github.com/linuxrebel/MonVisor/releases/tag/v0.1.0)** —
+download `monvisor-0.1.0-install.tar.gz` from the
+[releases page](https://github.com/linuxrebel/MonVisor/releases), then:
+
+```bash
+tar xzf monvisor-0.1.0-install.tar.gz
+cd monvisor-0.1.0-install
+python3 install.py
+```
+
+The tarball bundles the installer, the wheel, this guide, and the license — no
+clone or further downloads needed. The rest of this section covers installing
+from a clone or by hand.
 
 The fastest path is the bundled installer. It checks and installs the system
 prerequisites (nmap, curl, zstd, python venv), installs and starts Ollama and
