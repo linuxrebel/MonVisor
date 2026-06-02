@@ -61,42 +61,61 @@ def detect_pm():
 
 
 def ensure_system_packages(skip_sudo):
-    say("Checking system prerequisites (nmap, python venv)...")
-    needed = []
-    if not have("nmap"):
-        needed.append("nmap")
-    # venv: importable on most distros, but Debian/Ubuntu split it into python3-venv
+    """Ensure the external commands the installer relies on exist.
+
+    - nmap : MonVisor scanning
+    - curl : fetching the Ollama install script
+    - zstd : the Ollama installer ships zstd-compressed; without it the install
+             aborts with 'requires zstd for extraction'
+    Plus python venv support (split into python3-venv on Debian/Ubuntu).
+    Each command is verified by presence, installed if missing, then
+    RE-verified so a silent package-manager failure is surfaced, not assumed.
+    """
+    say("Checking system prerequisites (nmap, curl, zstd, python venv)...")
+
+    # command -> package name (same across dnf/apt/pacman for these three)
+    cmd_pkgs = {"nmap": "nmap", "curl": "curl", "zstd": "zstd"}
+    needed_pkgs = [pkg for cmd, pkg in cmd_pkgs.items() if not have(cmd)]
+
+    venv_missing = False
     try:
         import venv  # noqa: F401
     except ImportError:
-        needed.append("python3-venv")
+        venv_missing = True
 
-    if not needed:
+    if not needed_pkgs and not venv_missing:
         say("  System prerequisites already present.")
         return
 
     if skip_sudo:
-        warn(f"  Missing: {', '.join(needed)} — install manually (--no-sudo set).")
+        items = needed_pkgs + (["python3-venv"] if venv_missing else [])
+        warn(f"  Missing: {', '.join(items)} — install manually (--no-sudo set).")
         return
 
     pm, install = detect_pm()
     if not pm:
-        warn(f"  Could not detect package manager. Install manually: {', '.join(needed)}")
+        items = needed_pkgs + (["python3-venv"] if venv_missing else [])
+        warn(f"  Could not detect package manager. Install manually: {', '.join(items)}")
         return
 
-    # Package names differ slightly per distro.
-    pkgs = []
-    for n in needed:
-        if n == "python3-venv" and pm in ("dnf", "pacman"):
-            continue  # venv bundled with python3 on Fedora/Arch
-        pkgs.append("nmap" if n == "nmap" else n)
-    if not pkgs:
-        return
+    pkgs = list(needed_pkgs)
+    if venv_missing and pm == "apt":
+        pkgs.append("python3-venv")  # bundled with python3 on Fedora/Arch
 
-    say(f"  Installing via {pm}: {', '.join(pkgs)}")
-    r = run(install + pkgs)
-    if r.returncode != 0:
-        warn(f"  Package install returned {r.returncode}. Continuing — verify {pkgs} yourself.")
+    if pkgs:
+        say(f"  Installing via {pm}: {', '.join(pkgs)}")
+        r = run(install + pkgs)
+        if r.returncode != 0:
+            warn(f"  Package install returned {r.returncode}.")
+
+    # Re-verify the commands actually exist now. Leave nothing to chance.
+    still_missing = [cmd for cmd in cmd_pkgs if not have(cmd)]
+    if still_missing:
+        warn(f"  Still missing after install: {', '.join(still_missing)}.")
+        warn(f"  Install them manually ({pm}) and re-run, e.g.:")
+        warn(f"    sudo {pm} install {' '.join(cmd_pkgs[c] for c in still_missing)}")
+    else:
+        say("  System prerequisites ready.")
 
 
 # ── ollama + models ─────────────────────────────────────────────────────────
@@ -128,6 +147,14 @@ def install_ollama(mode):
         return False
 
     warn("  Ollama is not installed. It is required for embeddings and answers.")
+    # The Ollama install script needs curl to fetch and zstd to extract.
+    blockers = [c for c in ("curl", "zstd") if not have(c)]
+    if blockers:
+        warn(f"  Cannot install Ollama: missing {', '.join(blockers)}.")
+        warn("  Install these first (the prerequisite step should have), then re-run:")
+        warn(f"    sudo <pkg-manager> install {' '.join(blockers)}")
+        warn(f"    {OLLAMA_INSTALL_CMD}")
+        return False
     warn(f"  This will run, as root via sudo where needed:  {OLLAMA_INSTALL_CMD}")
     if mode == "prompt" and not confirm("  Install Ollama now?", default_yes=True):
         warn("  Skipping Ollama install. Install it yourself, then re-run:")
