@@ -229,6 +229,25 @@ hosts, exporter recommendations, RAG knowledge updates.
 AI-generated dashboards, Grafana-native review UI, enterprise auth (LDAP, Duo,
 AWS IAM, SAML).
 
+## Planning and Roadmap
+
+The `docs/` and `MD-Files/` directories contain the full architecture and
+execution planning documents for MonVisor's next development phases (4.7–4.12).
+
+| Document | Format | Description |
+|---|---|---|
+| [Architectural roadmap](MD-Files/Architectural_roadmap.md) · [docx](docs/Architectural_roadmap.docx) | MD / Word | Product philosophy, deployment model, entry points, and full phase-by-phase plan for phases 4.7–4.12 |
+| [Engineering map](MD-Files/Engineering_map.md) · [docx](docs/Engineering_map.docx) | MD / Word | Technology stack, file structure, SQLite schema, ChromaDB collections, all workflows, and build phase status |
+| [Execution plan](MD-Files/Monvisor_execution_plan.html) | HTML | Interactive dependency tree — red = to do, green = complete. Open locally in any browser; works fully offline. |
+
+The execution plan HTML can be opened directly from a clone without a server:
+
+```bash
+xdg-open MD-Files/Monvisor_execution_plan.html   # Linux
+open MD-Files/Monvisor_execution_plan.html        # macOS
+```
+
+
 ## Development
 
 ```bash
