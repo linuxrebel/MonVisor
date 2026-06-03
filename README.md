@@ -249,8 +249,8 @@ execution planning documents for MonVisor's next development phases (4.7–4.12)
 
 | Document | Description |
 |---|---|
-| Architectural roadmap &nbsp; [[MD]](MD-Files/Architectural_roadmap.md) [[Docx]](docs/Architectural_roadmap.docx?raw=true) | Product philosophy, deployment model, entry points, and full phase-by-phase plan for phases 4.7–4.12 |
-| Engineering map &nbsp; [[MD]](MD-Files/Engineering_map.md) [[Docx]](docs/Engineering_map.docx?raw=true) | Technology stack, file structure, SQLite schema, ChromaDB collections, all workflows, and build phase status |
+| Architectural roadmap &nbsp; [[MD]](MD-Files/Architectural_roadmap.md) [[Docx]](https://github.com/linuxrebel/MonVisor/raw/main/docs/Architectural_roadmap.docx) | Product philosophy, deployment model, entry points, and full phase-by-phase plan for phases 4.7–4.12 |
+| Engineering map &nbsp; [[MD]](MD-Files/Engineering_map.md) [[Docx]](https://github.com/linuxrebel/MonVisor/raw/main/docs/Engineering_map.docx) | Technology stack, file structure, SQLite schema, ChromaDB collections, all workflows, and build phase status |
 | [Execution plan ↗](https://htmlpreview.github.io/?https://github.com/linuxrebel/MonVisor/blob/main/MD-Files/Monvisor_execution_plan.html) | Interactive dependency tree — red = to do, green = complete. Click to open rendered in your browser. |
 
 The execution plan also opens locally from a clone (no server needed):
