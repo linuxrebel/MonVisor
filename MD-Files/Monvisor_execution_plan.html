@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MonVisor — Execution Plan</title>
+<style>
+  :root {
+    --done-bg: #f0fdf4; --done-text: #16a34a; --done-border: #86efac;
+    --todo-bg: #fef2f2; --todo-text: #dc2626; --todo-border: #fca5a5;
+    --goal-bg: #eff6ff; --goal-text: #2563eb; --goal-border: #93c5fd;
+    --surface: #ffffff; --surface2: #f8fafc; --surface3: #f1f5f9;
+    --border: #e2e8f0; --border2: #cbd5e1;
+    --text: #0f172a; --text2: #475569; --text3: #94a3b8;
+    --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --radius: 8px; --radius-lg: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --done-bg: #052e16; --done-text: #4ade80; --done-border: #166534;
+      --todo-bg: #450a0a; --todo-text: #f87171; --todo-border: #991b1b;
+      --goal-bg: #1e3a5f; --goal-text: #60a5fa; --goal-border: #1d4ed8;
+      --surface: #0f172a; --surface2: #1e293b; --surface3: #334155;
+      --border: #334155; --border2: #475569;
+      --text: #f1f5f9; --text2: #94a3b8; --text3: #64748b;
+    }
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--sans); background: var(--surface2); color: var(--text); font-size: 14px; line-height: 1.6; min-height: 100vh; padding: 0; }
+  .page-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 20px 32px; position: sticky; top: 0; z-index: 100; }
+  .page-header-inner { max-width: 900px; margin: 0 auto; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .page-title { font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
+  .page-subtitle { font-size: 13px; color: var(--text2); }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+  .prog-wrap { display: flex; align-items: center; gap: 8px; }
+  .prog-bar { width: 120px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .prog-fill { height: 100%; background: var(--done-text); border-radius: 3px; transition: width .4s; }
+  .prog-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
+  .btn-expand, .btn-collapse { font-size: 12px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border2); background: var(--surface); color: var(--text2); cursor: pointer; transition: background .15s, color .15s; }
+  .btn-expand:hover, .btn-collapse:hover { background: var(--surface3); color: var(--text); }
+  .legend { max-width: 900px; margin: 0 auto; padding: 14px 32px; display: flex; gap: 20px; align-items: center; font-size: 12px; color: var(--text2); flex-wrap: wrap; }
+  .leg-item { display: flex; align-items: center; gap: 6px; }
+  .leg-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .leg-dot.g { background: var(--done-text); }
+  .leg-dot.r { background: var(--todo-text); }
+  .leg-dot.b { background: var(--goal-text); }
+  .leg-hint { color: var(--text3); margin-left: 6px; }
+  .main { max-width: 900px; margin: 0 auto; padding: 8px 32px 48px; }
+  .et-row { display: flex; align-items: stretch; }
+  .et-spine { display: flex; flex-direction: column; align-items: center; width: 28px; flex-shrink: 0; }
+  .et-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid; flex-shrink: 0; margin-top: 14px; z-index: 1; }
+  .et-dot.g { border-color: var(--done-text); background: var(--done-bg); }
+  .et-dot.r { border-color: var(--todo-text); background: var(--todo-bg); }
+  .et-dot.b { border-color: var(--goal-text); background: var(--goal-bg); }
+  .et-line { width: 2px; flex: 1; background: var(--border2); min-height: 6px; }
+  .et-card { flex: 1; margin: 6px 0 6px 10px; border: 1px solid; border-radius: var(--radius-lg); overflow: hidden; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.04); transition: box-shadow .15s; }
+  .et-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,.08); }
+  .et-card.g { border-color: var(--done-border); }
+  .et-card.r { border-color: var(--todo-border); }
+  .et-card.b { border-color: var(--goal-border); }
+  .et-card.goal { cursor: default; }
+  .et-hdr { display: flex; align-items: center; gap: 10px; padding: 11px 16px; cursor: pointer; user-select: none; font-weight: 500; font-size: 14px; }
+  .et-card.goal .et-hdr { cursor: default; }
+  .et-hdr.g { background: var(--done-bg); color: var(--done-text); }
+  .et-hdr.r { background: var(--todo-bg); color: var(--todo-text); }
+  .et-hdr.b { background: var(--goal-bg); color: var(--goal-text); }
+  .et-num { font-size: 11px; font-weight: 600; letter-spacing: .03em; background: rgba(0,0,0,.06); padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
+  .et-name { flex: 1; }
+  .et-dep { font-size: 11px; font-weight: 400; background: var(--surface3); color: var(--text2); padding: 2px 7px; border-radius: 4px; white-space: nowrap; border: 1px solid var(--border); }
+  .et-chev { font-size: 11px; opacity: .5; flex-shrink: 0; transition: transform .2s; }
+  .et-card.open .et-chev { transform: rotate(90deg); }
+  .et-tasks { display: none; padding: 12px 16px 14px; border-top: 1px solid var(--border); background: var(--surface); }
+  .et-card.open .et-tasks { display: block; }
+  .et-task { display: flex; align-items: flex-start; gap: 9px; padding: 4px 0; font-size: 13px; color: var(--text); line-height: 1.5; }
+  .et-tdot { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .et-tdot.g { background: var(--done-text); }
+  .et-tdot.r { background: var(--todo-text); }
+  code { font-family: var(--mono); font-size: 11.5px; background: var(--surface3); padding: 1px 5px; border-radius: 4px; color: var(--text2); border: 1px solid var(--border); }
+  .et-split-wrap { margin: 2px 0 2px 28px; border: 1px dashed var(--border2); border-radius: var(--radius-lg); padding: 14px 12px 8px; position: relative; background: var(--surface2); }
+  .et-split-label { position: absolute; top: -9px; left: 14px; background: var(--surface2); padding: 0 6px; font-size: 11px; color: var(--text3); letter-spacing: .02em; }
+  .et-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 600px) { .et-cols { grid-template-columns: 1fr; } }
+  .et-col-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text3); text-align: center; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .et-col-track { position: relative; }
+  .et-converge { display: flex; align-items: center; gap: 8px; margin: 4px 0 4px 28px; font-size: 12px; color: var(--text3); padding: 6px 12px; }
+  .et-converge-line { flex: 1; height: 1px; background: repeating-linear-gradient(to right, var(--border2) 0, var(--border2) 4px, transparent 4px, transparent 8px); }
+  .page-footer { border-top: 1px solid var(--border); padding: 16px 32px; font-size: 12px; color: var(--text3); text-align: center; background: var(--surface); }
+  @media print { .page-header { position: static; } .et-tasks { display: block !important; } .et-chev { display: none; } .btn-expand, .btn-collapse { display: none; } }
+</style>
+</head>
+<body>
+
+<header class="page-header">
+  <div class="page-header-inner">
+    <div>
+      <div class="page-title">MonVisor — Execution Plan</div>
+      <div class="page-subtitle">Phases 4.7–4.12 &nbsp;·&nbsp; Free tier &nbsp;·&nbsp; Pre Phase 5</div>
+    </div>
+    <div class="header-right">
+      <div class="prog-wrap">
+        <div class="prog-bar"><div class="prog-fill" style="width:41%"></div></div>
+        <span class="prog-label">5 / 12 phases complete</span>
+      </div>
+      <button class="btn-expand" onclick="expandAll()">Expand all</button>
+      <button class="btn-collapse" onclick="collapseAll()">Collapse all</button>
+    </div>
+  </div>
+</header>
+
+<div class="legend">
+  <div class="leg-item"><div class="leg-dot g"></div> Complete</div>
+  <div class="leg-item"><div class="leg-dot r"></div> To do</div>
+  <div class="leg-item"><div class="leg-dot b"></div> Goal</div>
+  <span class="leg-hint">— click any phase header to expand tasks &nbsp;·&nbsp; works fully offline</span>
+</div>
+
+<main class="main">
+
+  <!-- Completed foundation -->
+  <div class="et-row">
+    <div class="et-spine"><div class="et-dot g"></div><div class="et-line"></div></div>
+    <div class="et-card g" onclick="etToggle(this)">
+      <div class="et-hdr g"><span class="et-num">✓ done</span><span class="et-name">Completed foundation — phases 1 through 4.6</span><span class="et-chev">▶</span></div>
+      <div class="et-tasks">
+        <div class="et-task"><div class="et-tdot g"></div><span><strong>Phase 1 — Foundation:</strong> project scaffold, pyproject.toml, Click CLI, SQLite schema + all tables, ChromaDB with 275 pairs + 51 exemplars, bcrypt auth, nomic-embed-text, pip install -e .</span></div>
+        <div class="et-task"><div class="et-tdot g"></div><span><strong>Phase 2 — Discovery:</strong> nmap CIDR scan, service fingerprinting (port→type), Rich terminal report, HTML report generation → ~/.monvisor/reports/</span></div>
+        <div class="et-task"><div class="et-tdot g"></div><span><strong>Phase 3 — Review + Generate:</strong> terminal review workflow (Y/n/skip), FastAPI + Jinja2 web UI, bcrypt auth on UI, RAG+Ollama→YAML, promtool validation, monvisor review / generate / ui commands</span></div>
+        <div class="et-task"><div class="et-tdot g"></div><span><strong>Phase 4 — Polish + Package:</strong> nginx auto-config generator, SSH tunnel detection, AppImage packaging, knowledge update installer, monvisor knowledge update command</span></div>
+        <div class="et-task"><div class="et-tdot g"></div><span><strong>Phase 4.6 — Self-knowledge + Ask:</strong> 57-pair MonVisor self-knowledge corpus shard, combined.jsonl (174→231 pairs), monvisor ask RAG Q&amp;A command, 2-layer relevance gate, store-orphaning fix, init false-success fix, --reset-knowledge flag</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 4.9 -->
+  <div class="et-row">
+    <div class="et-spine"><div class="et-dot r"></div><div class="et-line"></div></div>
+    <div class="et-card r" onclick="etToggle(this)">
+      <div class="et-hdr r"><span class="et-num">4.9</span><span class="et-name">Network Discovery Overhaul</span><span class="et-dep">unlocks → 4.10 and 4.11</span><span class="et-chev">▶</span></div>
+      <div class="et-tasks">
+        <div class="et-task"><div class="et-tdot r"></div><span>SQLite migration 0002 — <code>hosts</code> table: ip, mac, vendor, hostname, device_type, scan_status (pending/configured/missing/forgotten), responds_icmp/arp/tcp80/tcp443/snmp/mdns, first_seen, last_seen, scan_count, notes, UNIQUE(env_id, ip)</span></div>
+        <div class="et-task"><div class="et-tdot r"></div><span><code>net/discover.py</code> — Pass 1 host discovery: <code>nmap -sn -T3 -PE -PP -PM</code>; ARP via scapy (same-subnet only, skip if routed); mDNS passive listen via avahi-browse if available</span></div>
+        <div class="et-task"><div class="et-tdot r"></div><span>Rewrite <code>cli/scan.py</code> — two-pass strategy; root/<code>cap_net_raw</code> detection with one-time advisory; one-time-scan guard (warn if env already has completed scan, require <code>--refresh</code>); change diff report (NEW / GONE / CHANGED)</span></div>
+        <div class="et-task"><div class="et-tdot r"></div><span><code>net/oui.py</code> + bundle <code>monvisor/data/oui_mini.json</code> (~40 KB, top-2000 OUI vendors, covers &gt;95% of real networks). No external lookup at scan time.</span></div>
+        <div class="et-task"><div class="et-tdot r"></div><span><code>net/fingerprint.py</code> — extracted from scan.py and expanded; add IoT/device ports: 80, 443, 554/8554 (RTSP cameras), 161 (SNMP), 5353 (mDNS confirm); HTTP Server-header probing for device type</span></div>
+        <div class="et-task"><div class="et-tdot r"></div><span><code>cli/hosts.py</code> — <code>monvisor hosts &lt;env&gt;</code> command with flags: <code>--unknown</code> (device_type=unknown), <code>--unmonitored</code> (scan_status=pending), <code>--missing</code> (scan_status=missing), <code>--json</code></span></div>
+        <div class="et-task"><div class="et-tdot r"></div><span>Add <code>host_id</code> FK column to services table (migration 0002); create <code>host_current_services</code> view (latest state per host without historical joins)</span></div>
+        <div class="et-task"><div class="et-tdot r"></div><span>Missing host prompt on targeted rescan — <code>monvisor scan &lt;env&gt; --host &lt;ip&gt;</code> no response: [1] Temporarily offline  [2] Decommissioned / forget  [3] IP reassigned</span></div>
+        <div class="et-task"><div class="et-tdot r"></div><span>Add optional <code>scapy&gt;=2.5</code> to pyproject.toml as <code>[project.optional-dependencies] scan</code>; graceful fallback if absent</span></div>
+        <div class="et-task"><div class="et-tdot r"></div><span>Update <code>tests/test_smoke.py</code> — hosts table schema, OUI lookup, scan guard, host_current_services view, missing host prompt logic</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SPLIT: parallel tracks -->
+  <div class="et-split-wrap">
+    <span class="et-split-label">parallel tracks — both start after 4.9 completes</span>
+    <div class="et-cols">
+
+      <!-- Main track -->
+      <div class="et-col-track">
+        <div class="et-col-lbl">main track</div>
+
+        <!-- 4.10 -->
+        <div class="et-row">
+          <div class="et-spine"><div class="et-dot r"></div><div class="et-line"></div></div>
+          <div class="et-card r" onclick="etToggle(this)">
+            <div class="et-hdr r"><span class="et-num">4.10</span><span class="et-name">Brownfield Import</span><span class="et-dep">needs: 4.9</span><span class="et-chev">▶</span></div>
+            <div class="et-tasks">
+              <div class="et-task"><div class="et-tdot r"></div><span><code>parsers/prometheus.py</code> — parse prometheus.yml: extract scrape_configs, static_configs, targets, job names, labels; handle file_sd, dns_sd (best-effort); flag kubernetes_sd / ec2_sd as unsupported</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>parsers/alertmanager.py</code> — parse alertmanager.yml: routes, receivers, inhibit rules, global config</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>cli/import_config.py</code> — <code>monvisor import</code> command with <code>--prometheus-config</code>, <code>--alertmanager-config</code>, <code>--grafana-url/--grafana-token</code>, <code>--env</code> flags. Populates hosts (scan_status=configured) + services. Original files never modified.</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Partial import handling — flag unresolvable targets, skip unsupported SD types with note, print structured summary: N imported / M flagged / K skipped</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Update tests — import a known prometheus.yml fixture, verify host count, service count, flagged count</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4.7 -->
+        <div class="et-row">
+          <div class="et-spine"><div class="et-dot r"></div><div class="et-line"></div></div>
+          <div class="et-card r" onclick="etToggle(this)">
+            <div class="et-hdr r"><span class="et-num">4.7</span><span class="et-name">AI Intelligence</span><span class="et-dep">needs: 4.10</span><span class="et-chev">▶</span></div>
+            <div class="et-tasks">
+              <div class="et-task"><div class="et-tdot r"></div><span>Add <code>trafilatura&gt;=1.8</code> to pyproject.toml; add <code>playwright&gt;=1.40</code> to optional <code>[browser]</code> extra</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>rag/prompts.py</code> — centralise ALL prompt strings: domain system prompt, ask tier messages, configure loop system prompt, INSUFFICIENT_CONTEXT sentinel, READY_TO_GENERATE token</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>rag/fetch.py</code> — httpx GET with configurable timeout; trafilatura.extract() for clean text; Playwright optional fallback check at runtime; returns (text, final_url, content_hash)</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>rag/learn.py</code> — ingest fetched/pasted content into <code>learned</code> collection; SHA-256 content-hash dedup; set TTL metadata on fetch; stale-flag logic on query</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>rag/store.py</code> — add <code>learned</code> collection alongside pairs + exemplars; update reset_collection; <code>monvisor knowledge status</code> reports learned count + stale count</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>rag/query.py</code> — 3-tier ask routing: Tier 1 RAG → Tier 2 general domain Ollama prompt → Tier 3 web fetch or guided search. <code>generate</code> path unchanged.</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>cli/main.py</code> ask command — update for 3-tier; offline guided-search output; session paste-in as Tier 3 fallback; <code>monvisor knowledge refresh</code> and <code>monvisor knowledge prune --days N</code></span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Add <code>web_fetch:</code> block to config.yml: enabled, ttl_days, timeout_seconds, max_content_kb. Prompt user at <code>monvisor init</code>.</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Update tests — tier 1/2/3 routing, learned collection dedup, TTL stale flag, offline fallback format, knowledge prune</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4.8a -->
+        <div class="et-row">
+          <div class="et-spine"><div class="et-dot r"></div><div class="et-line"></div></div>
+          <div class="et-card r" onclick="etToggle(this)">
+            <div class="et-hdr r"><span class="et-num">4.8a</span><span class="et-name">Interactive Configure</span><span class="et-dep">needs: 4.7</span><span class="et-chev">▶</span></div>
+            <div class="et-tasks">
+              <div class="et-task"><div class="et-tdot r"></div><span><code>cli/configure.py</code> — <code>monvisor configure &lt;env&gt; &lt;host&gt;</code>; load host + services context; Gemma4 REPL loop; max turns from MONVISOR_CONFIGURE_MAX_TURNS (default 8)</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Configure system prompt (in prompts.py) — one question at a time; available strategies listed; [READY_TO_GENERATE] exit token; max 8 questions; don't repeat</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>[READY_TO_GENERATE] signal detection — scan each LLM response; extract YAML below it; exit loop; run promtool if prometheus type; write to configs table as config_type='custom_scrape'</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Conversation history held in memory for session. Route to 4.8b synthetic branch when Gemma4 detects "application workflow / transaction / multi-step" intent.</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>cli/generate.py</code> — integrate custom_scrape config type: load all custom_scrape records and append to final prometheus.yml assembly</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Corpus pair saving — on exit prompt "Save this session as a knowledge pair? [Y/n]"; write JSONL to ~/.monvisor/learned_configure/</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Add <code>configure: {max_turns: 8, save_as_corpus: ask}</code> block to config.yml</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Update tests — loop exits on signal, YAML extraction, custom_scrape assembly, corpus save path</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4.8b -->
+        <div class="et-row">
+          <div class="et-spine"><div class="et-dot r"></div><div class="et-line" style="min-height:4px"></div></div>
+          <div class="et-card r" onclick="etToggle(this)">
+            <div class="et-hdr r"><span class="et-num">4.8b</span><span class="et-name">Synthetic Monitoring</span><span class="et-dep">needs: 4.8a</span><span class="et-chev">▶</span></div>
+            <div class="et-tasks">
+              <div class="et-task"><div class="et-tdot r"></div><span><code>synthetic/runner.py</code> — step execution engine: HTTP GET/POST (httpx), TCP connect, ICMP ping; per-step timeout, success/fail, value extraction (JSONPath / regex); ordered execution; stop-on-failure mode</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>synthetic/exporter.py</code> — Prometheus metrics endpoint :9399; monvisor_synthetic_step_duration_seconds, monvisor_synthetic_step_success, monvisor_synthetic_test_success, monvisor_synthetic_test_last_run_timestamp</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>synthetic/schema.py</code> — YAML test definition validation: name, interval, timeout, steps (name, type, url, body, headers, expect_status, expect_body_contains, extract)</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>cli/synthetic.py</code> — start / stop / list / status &lt;name&gt; / create &lt;name&gt; commands; systemd unit template → ~/.monvisor/synthetic-runner.service</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Auto alert rule generation — for each test: step failure sustained 2 minutes → alert with test + step labels; appended to rules file on generate</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Secrets management — ~/.monvisor/synthetic_secrets/&lt;test_name&gt;.env at 0600 permissions; injected as env vars at runner startup; never in YAML definition</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Extend configure agent loop synthetic branch — Gemma4 walks through step definition, expected responses, timeouts; emits test YAML via [READY_TO_GENERATE]</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Update tests — step execution mock, metric output format, schema validation, secret injection, alert rule generation</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Parallel track -->
+      <div class="et-col-track">
+        <div class="et-col-lbl">parallel track</div>
+
+        <!-- 4.11 -->
+        <div class="et-row">
+          <div class="et-spine"><div class="et-dot r"></div><div class="et-line"></div></div>
+          <div class="et-card r" onclick="etToggle(this)">
+            <div class="et-hdr r"><span class="et-num">4.11</span><span class="et-name">Phased Cutover</span><span class="et-dep">needs: 4.9</span><span class="et-chev">▶</span></div>
+            <div class="et-tasks">
+              <div class="et-task"><div class="et-tdot r"></div><span>Default null receiver Alertmanager config — written at monvisor init; all routes → null; never auto-modified; only changed by <code>monvisor alerting enable</code></span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>cli/cutover.py</code> — <code>monvisor cutover status</code> (phase + meaning + next step) and <code>monvisor cutover advance</code> (requires explicit confirm; writes phase to config.yml; never auto-advances)</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>cli/alerting.py</code> — <code>monvisor alerting enable &lt;type&gt;</code> for PagerDuty (--integration-key), email (--smtp-host), Slack (--webhook); disable; test (sends through real channel)</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Phase 1–4 definitions in code — what each phase means, what the user should do, what "advance" enables. Phase state in config.yml as cutover_phase: 1. Surface in monvisor init output and web UI header.</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Update tests — null receiver present after init, advance requires confirm, alerting enable writes correct Alertmanager config snippet, test notification path</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4.12 -->
+        <div class="et-row">
+          <div class="et-spine"><div class="et-dot r"></div><div class="et-line" style="min-height:4px"></div></div>
+          <div class="et-card r" onclick="etToggle(this)">
+            <div class="et-hdr r"><span class="et-num">4.12</span><span class="et-name">IaC Export</span><span class="et-dep">needs: 4.11</span><span class="et-chev">▶</span></div>
+            <div class="et-tasks">
+              <div class="et-task"><div class="et-tdot r"></div><span><code>iac/base.py</code> — shared rendering logic: config snapshot walker, version stamp, file inventory builder, output directory management (~/.monvisor/iac/)</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>iac/ansible.py</code> — playbook generator: Prometheus config + rules + scrape jobs, Alertmanager (suppression state preserved), Grafana datasources + dashboards, synthetic test runner service, MonVisor install + config, nginx config</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>iac/terraform.py</code> — module generator for users provisioning the MonVisor host via Terraform; covers packages, config files, service units</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span><code>cli/iac.py</code> — <code>monvisor iac generate --format ansible|terraform</code>, <code>monvisor iac status</code> (last generated + pending changes), <code>monvisor iac diff</code> (what would regenerate)</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Auto-regeneration hook — trigger on any accepted MonVisor-proposed change (config write, knowledge update, alerting change); regenerate relevant IaC artifacts silently</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Puppet/Salt stubs — monvisor iac generate --format puppet|salt prints: "not yet implemented — contributions welcome at github.com/linuxrebel/MonVisor"</span></div>
+              <div class="et-task"><div class="et-tdot r"></div><span>Update tests — playbook renders without error, idempotent regeneration (same input → same output), diff detects a config change</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /et-cols -->
+  </div><!-- /et-split-wrap -->
+
+  <!-- Converge -->
+  <div class="et-converge">
+    <div class="et-converge-line"></div>
+    <span>both tracks complete</span>
+    <div class="et-converge-line"></div>
+  </div>
+
+  <!-- Goal -->
+  <div class="et-row">
+    <div class="et-spine"><div class="et-dot b"></div></div>
+    <div class="et-card b goal">
+      <div class="et-hdr b">
+        <span class="et-num">goal</span>
+        <span class="et-name">MonVisor platform complete — phases 4.7–4.12 shipped, free tier solid, Phase 5 ready</span>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer class="page-footer">
+  MonVisor &nbsp;·&nbsp; GPL-3.0-or-later &nbsp;·&nbsp; Generated 2026-06-03 &nbsp;·&nbsp; Offline-capable, no external dependencies
+</footer>
+
+<script>
+  function etToggle(card) { card.classList.toggle('open'); }
+  function expandAll() { document.querySelectorAll('.et-card.r, .et-card.g').forEach(c => c.classList.add('open')); }
+  function collapseAll() { document.querySelectorAll('.et-card').forEach(c => c.classList.remove('open')); }
+</script>
+</body>
+</html>
