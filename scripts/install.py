@@ -36,7 +36,7 @@ import urllib.request
 from pathlib import Path
 
 REPO = "linuxrebel/MonVisor"
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 WHEEL_NAME = f"monvisor-{VERSION}-py3-none-any.whl"
 RELEASE_URL = f"https://github.com/{REPO}/releases/download/v{VERSION}/{WHEEL_NAME}"
 LLM_MODEL = "gemma4:latest"
@@ -54,9 +54,11 @@ def run(cmd, **kw):
     return subprocess.run(cmd, **kw)
 def have(binary): return shutil.which(binary) is not None
 
-# Rough disk budget: gemma4 (~9.6G) + nomic-embed (~0.3G) + venv & deps (~1.5G),
-# plus headroom for Ollama's temp '-partial' blob during the pull.
-MIN_FREE_GB = 14
+# Free-disk floor for the pre-flight warning. A full install consumes ~16-17 GB
+# (gemma4 ~9.6G + nomic-embed ~0.3G + venv & deps, plus Ollama's temp '-partial'
+# blob during the pull). 20 GB free completes with a small margin; below that it
+# gets tight, so warn. This is FREE space, not total disk size.
+MIN_FREE_GB = 20
 
 
 def free_gb(path):

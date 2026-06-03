@@ -9,10 +9,13 @@ features use a local [Ollama](https://ollama.com/) instance.
 
 ## What you need
 
-- A Linux host (Fedora/RHEL, Debian/Ubuntu, or Arch). macOS works for the
-  Python parts but the system-package step assumes Linux.
+- A Linux host (Fedora/RHEL/CentOS/Rocky, Debian/Ubuntu, or Arch). macOS works
+  for the Python parts but the system-package step assumes Linux.
 - Python 3.11 or newer.
-- About 11 GB of free disk for the Ollama models.
+- Disk: the install itself uses ~16–17 GB (Ollama models are the bulk — gemma4
+  is ~9.6 GB). 25 GB is the practical minimum but leaves the disk at ~80% full
+  with little room for scan data and reports; **35–40 GB recommended** for
+  comfortable working room.
 - sudo access (to install system packages and Ollama).
 
 ## The two ways to install
@@ -66,7 +69,7 @@ Five steps. This is exactly what the script automates.
 ### 1. System prerequisites
 
 ```bash
-# Fedora / RHEL
+# Fedora / RHEL / CentOS / Rocky
 sudo dnf install -y python3 python3-pip nmap curl zstd
 
 # Debian / Ubuntu
@@ -79,6 +82,14 @@ sudo pacman -S --noconfirm python python-pip nmap curl zstd
 `nmap` is used for service discovery. `curl` and `zstd` are required to install
 Ollama in the next step: the Ollama installer ships zstd-compressed and aborts
 with "requires zstd for extraction" if zstd is absent.
+
+> **Debian/Ubuntu note:** the venv package is version-specific (e.g.
+> `python3.14-venv`). The generic `python3-venv` metapackage can lag the
+> installed interpreter on minimal images, leaving `python3 -m venv` unable to
+> bootstrap pip ("ensurepip is not available"). If that happens, install the
+> versioned package matching `python3 --version` — e.g.
+> `sudo apt install python3.14-venv`. The scripted installer detects and handles
+> this automatically.
 
 ### 2. Install and start Ollama
 
@@ -186,10 +197,12 @@ curl -fsSL https://ollama.com/install.sh | sh
 ```
 
 **Out of disk during model pull.** The models are large — `gemma4` alone is
-~9.6 GB, plus `nomic-embed-text` and the Python dependencies. Budget at least
-12–15 GB free. Ollama stores models under `~/.ollama` (or `/usr/share/ollama`
-when run as a system service); make sure that filesystem has room. On a VM,
-size the disk accordingly before installing. To put models elsewhere, set
+~9.6 GB, plus `nomic-embed-text` and the Python dependencies. A full install
+uses ~16–17 GB; 25 GB is the bare minimum (it lands around 80% full) and
+35–40 GB is recommended so there's room for scan data and reports. Ollama
+stores models under `~/.ollama` (or `/usr/share/ollama` when run as a system
+service); make sure that filesystem has room. On a VM, size the disk
+accordingly before installing. To put models elsewhere, set
 `OLLAMA_MODELS=/path/with/space` before pulling.
 
 **`ollama: command not found` after install.** The install didn't complete —

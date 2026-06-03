@@ -1,6 +1,6 @@
 [project]
 name = "monvisor"
-version = "0.1.0"
+version = "0.1.1"
 description = "AI-powered monitoring advisor for Prometheus/Grafana environments"
 requires-python = ">=3.11"
 readme = "README.md"

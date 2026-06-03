@@ -11,7 +11,7 @@ data leaves the host and there is no API cost.
 > plus an optional web review UI and nginx config). Deploy/Grafana automation is
 > the paid tier and not yet implemented.
 >
-> **Latest release:** [v0.1.0](https://github.com/linuxrebel/MonVisor/releases/tag/v0.1.0) · [all releases](https://github.com/linuxrebel/MonVisor/releases)
+> **Latest release:** [v0.1.1](https://github.com/linuxrebel/MonVisor/releases/tag/v0.1.1) · [all releases](https://github.com/linuxrebel/MonVisor/releases)
 
 ## How it works
 
@@ -31,7 +31,7 @@ scan  ──▶  review  ──▶  generate  ──▶  (deploy: paid)
 - [Ollama](https://ollama.com/) running locally, with:
   - an LLM (default `gemma4:latest`)
   - the embedding model `nomic-embed-text:latest`
-- ~12–15 GB free disk for the models
+- ~20 GB free disk to install (~16–17 GB used; 35–40 GB total recommended for working room)
 - `promtool` (optional) for config validation
 
 Tested on Fedora/RHEL/CentOS/Rocky (dnf) and Debian/Ubuntu (apt). The bundled
@@ -40,13 +40,13 @@ steps below if you prefer to install by hand.
 
 ## Install
 
-**Latest release: [v0.1.0](https://github.com/linuxrebel/MonVisor/releases/tag/v0.1.0)** —
-download `monvisor-0.1.0-install.tar.gz` from the
+**Latest release: [v0.1.1](https://github.com/linuxrebel/MonVisor/releases/tag/v0.1.1)** —
+download `monvisor-0.1.1-install.tar.gz` from the
 [releases page](https://github.com/linuxrebel/MonVisor/releases), then:
 
 ```bash
-tar xzf monvisor-0.1.0-install.tar.gz
-cd monvisor-0.1.0-install
+tar xzf monvisor-0.1.1-install.tar.gz
+cd monvisor-0.1.1-install
 python3 install.py
 ```
 
@@ -130,10 +130,10 @@ python3 -m venv ~/.venvs/monvisor
 source ~/.venvs/monvisor/bin/activate
 
 # from a release wheel (recommended)
-pip install monvisor-0.1.0-py3-none-any.whl
+pip install monvisor-0.1.1-py3-none-any.whl
 
 # or from the sdist
-pip install monvisor-0.1.0.tar.gz
+pip install monvisor-0.1.1.tar.gz
 
 # or from a source clone
 pip install .

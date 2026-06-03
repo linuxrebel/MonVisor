@@ -13,6 +13,7 @@ The version lives in two files and must match the git tag:
 
 If you bump the version, change both files first, in their own commit, before
 tagging. A mismatch means the installer builds a URL for the wrong asset.
+(Current release: 0.1.1.)
 
 ## Prerequisites
 
@@ -41,8 +42,8 @@ git show origin/main:INSTALL.md | head -1                # expect the title line
 ### 2. Verify version sync
 
 ```bash
-grep '^version' pyproject.toml          # version = "0.1.0"
-grep '^VERSION' scripts/install.py      # VERSION = "0.1.0"
+grep '^version' pyproject.toml          # version = "0.1.1"
+grep '^VERSION' scripts/install.py      # VERSION = "0.1.1"
 ```
 
 Both must match the tag you're about to create.
@@ -63,25 +64,25 @@ unzip -p dist/*.whl monvisor/knowledge/v1.0/corpus.jsonl | grep -c .   # expect 
 ### 4. Tag and push the tag
 
 ```bash
-git tag -a v0.1.0 -m "MonVisor 0.1.0"
-git push origin v0.1.0
+git tag -a v0.1.1 -m "MonVisor 0.1.1"
+git push origin v0.1.1
 ```
 
 ### 5. Create the GitHub release with both artifacts
 
 ```bash
-gh release create v0.1.0 \
-  dist/monvisor-0.1.0-py3-none-any.whl \
-  dist/monvisor-0.1.0.tar.gz \
-  --title "MonVisor 0.1.0" \
+gh release create v0.1.1 \
+  dist/monvisor-0.1.1-py3-none-any.whl \
+  dist/monvisor-0.1.1.tar.gz \
+  --title "MonVisor 0.1.1" \
   --notes "Free-tier CLI: scan, review, generate, ask. Self-contained 231-pair
 knowledge base bundled. Requires Ollama (gemma4 + nomic-embed-text) and nmap.
 See INSTALL.md."
 ```
 
-(Web UI alternative: Releases → Draft a new release → choose tag `v0.1.0` →
+(Web UI alternative: Releases → Draft a new release → choose tag `v0.1.1` →
 drag both files from `dist/` into the assets. The wheel filename must stay
-exactly `monvisor-0.1.0-py3-none-any.whl` or the installer's download URL
+exactly `monvisor-0.1.1-py3-none-any.whl` or the installer's download URL
 won't match.)
 
 ### 6. Verify the published release
@@ -89,7 +90,7 @@ won't match.)
 ```bash
 # the URL the installer will hit — should return HTTP 200
 curl -fsSL -o /dev/null -w "%{http_code}\n" \
-  https://github.com/linuxrebel/MonVisor/releases/download/v0.1.0/monvisor-0.1.0-py3-none-any.whl
+  https://github.com/linuxrebel/MonVisor/releases/download/v0.1.1/monvisor-0.1.1-py3-none-any.whl
 ```
 
 ### 7. End-to-end test (clean box, clone-free)
