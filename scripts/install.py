@@ -54,6 +54,22 @@ def run(cmd, **kw):
     return subprocess.run(cmd, **kw)
 def have(binary): return shutil.which(binary) is not None
 
+# Rough disk budget: gemma4 (~9.6G) + nomic-embed (~0.3G) + venv & deps (~1.5G),
+# plus headroom for Ollama's temp '-partial' blob during the pull.
+MIN_FREE_GB = 14
+
+
+def free_gb(path):
+    """Free space in GB on the filesystem holding the nearest existing parent
+    of `path` (the path itself may not exist yet)."""
+    p = Path(path).expanduser()
+    while not p.exists() and p != p.parent:
+        p = p.parent
+    try:
+        return shutil.disk_usage(p).free / 1e9
+    except Exception:
+        return None
+
 
 # ── system packages ─────────────────────────────────────────────────────────
 
@@ -85,30 +101,66 @@ def ensure_system_packages(skip_sudo):
     cmd_pkgs = {"nmap": "nmap", "curl": "curl", "zstd": "zstd"}
     needed_pkgs = [pkg for cmd, pkg in cmd_pkgs.items() if not have(cmd)]
 
+    # venv check: probe ensurepip, NOT venv. On Debian/Ubuntu the `venv` module
+    # imports fine (pure stdlib) but ensurepip ships separately in the
+    # python3.X-venv package; without it EnvBuilder(with_pip=True) dies with
+    # "ensurepip is not available". So `import venv` is a false positive there.
     venv_missing = False
     try:
-        import venv  # noqa: F401
+        import ensurepip  # noqa: F401
     except ImportError:
         venv_missing = True
+
+    # Debian/Ubuntu want the version-specific name (e.g. python3.14-venv);
+    # the generic python3-venv is a metapackage that may lag the running
+    # interpreter. Try versioned first, then generic.
+    #
+    # FUTURE ISSUE: this assumes the package is *named* python3.X-venv / python3-venv.
+    # That convention has held across Debian/Ubuntu for years but is not guaranteed
+    # forever (e.g. a hypothetical Ubuntu 28.04 could rename or restructure it). If
+    # that happens, both candidates miss the apt-cache probe and the install fails;
+    # the post-install ensurepip re-check below then prints an actionable manual
+    # 'apt install ...' hint rather than crashing. The fix at that point is to add
+    # the new name to this list. We deliberately don't try to resolve the package
+    # dynamically (apt's 'what provides ensurepip' metadata is unreliable) — best
+    # guess + honest verification is the right amount of engineering here.
+    pyver = f"{sys.version_info.major}.{sys.version_info.minor}"
+    apt_venv_pkgs = [f"python{pyver}-venv", "python3-venv"]
 
     if not needed_pkgs and not venv_missing:
         say("  System prerequisites already present.")
         return
 
     if skip_sudo:
-        items = needed_pkgs + (["python3-venv"] if venv_missing else [])
+        items = needed_pkgs + (apt_venv_pkgs[:1] if venv_missing else [])
         warn(f"  Missing: {', '.join(items)} — install manually (--no-sudo set).")
         return
 
     pm, install = detect_pm()
     if not pm:
-        items = needed_pkgs + (["python3-venv"] if venv_missing else [])
+        items = needed_pkgs + (apt_venv_pkgs[:1] if venv_missing else [])
         warn(f"  Could not detect package manager. Install manually: {', '.join(items)}")
         return
 
     pkgs = list(needed_pkgs)
+    venv_pkg = None
     if venv_missing and pm == "apt":
-        pkgs.append("python3-venv")  # bundled with python3 on Fedora/Arch
+        # Pick the first apt candidate that actually exists in the cache;
+        # versioned name preferred, generic as fallback. If none match (e.g. a
+        # future rename), fall through with the versioned guess so apt produces
+        # a real error, which the ensurepip re-check below turns into a hint.
+        for cand in apt_venv_pkgs:
+            probe = subprocess.run(["apt-cache", "show", cand],
+                                   capture_output=True, text=True)
+            if probe.returncode == 0 and probe.stdout.strip():
+                venv_pkg = cand
+                break
+        if not venv_pkg:
+            warn(f"  No known venv package found in apt ({', '.join(apt_venv_pkgs)}).")
+            warn("  Attempting the versioned name anyway; if it fails, the package")
+            warn("  may have been renamed on this release — see the hint below.")
+        venv_pkg = venv_pkg or apt_venv_pkgs[0]
+        pkgs.append(venv_pkg)  # bundled with python3 on Fedora/Arch
 
     if pkgs:
         say(f"  Installing via {pm}: {', '.join(pkgs)}")
@@ -118,11 +170,22 @@ def ensure_system_packages(skip_sudo):
 
     # Re-verify the commands actually exist now. Leave nothing to chance.
     still_missing = [cmd for cmd in cmd_pkgs if not have(cmd)]
+    # ensurepip must be importable in a FRESH interpreter — the current process
+    # cached the failed import, so re-probe via a subprocess.
+    ensurepip_ok = subprocess.run(
+        [sys.executable, "-c", "import ensurepip"],
+        capture_output=True).returncode == 0
     if still_missing:
         warn(f"  Still missing after install: {', '.join(still_missing)}.")
         warn(f"  Install them manually ({pm}) and re-run, e.g.:")
         warn(f"    sudo {pm} install {' '.join(cmd_pkgs[c] for c in still_missing)}")
-    else:
+    if venv_missing and not ensurepip_ok:
+        pkg_hint = venv_pkg or apt_venv_pkgs[0]
+        warn(f"  Python venv support (ensurepip) still unavailable.")
+        warn(f"  Install it and re-run:  sudo {pm} install {pkg_hint}")
+        warn(f"  (If that package doesn't exist, this Ubuntu/Debian release may have")
+        warn(f"   renamed it; find the package providing ensurepip for python{pyver}.)")
+    if not still_missing and (not venv_missing or ensurepip_ok):
         say("  System prerequisites ready.")
 
 
@@ -356,14 +419,35 @@ def main():
 
     print(f"\n{C_OK}MonVisor installer{C_END}  (v{VERSION})\n")
 
+    # Pre-flight disk check. The model pull + venv together need ~14 GB; a
+    # half-finished pull dies with 'no space left on device' and leaves a
+    # partial blob behind. Warn loudly up front rather than after a long pull.
+    venv_path = Path(args.venv).expanduser()
+    if not (args.no_models and args.no_init):
+        avail = free_gb(venv_path)
+        if avail is not None and avail < MIN_FREE_GB:
+            warn(f"Low disk space: {avail:.1f} GB free where models + venv go; "
+                 f"~{MIN_FREE_GB} GB recommended.")
+            warn("  The gemma4 pull (~9.6 GB) will likely fail with 'no space left")
+            warn("  on device'. Free space or grow the disk, then re-run. Continuing")
+            warn("  anyway since some setups split /home and the model store.")
+
     ensure_system_packages(args.no_sudo)
     models_ready = ensure_models(args.no_models, ollama_mode)
 
-    venv_path = Path(args.venv).expanduser()
     wheel = resolve_wheel(args.wheel, venv_path.parent if venv_path.parent.exists()
                           else Path.cwd())
-    venv_path.parent.mkdir(parents=True, exist_ok=True)
-    monvisor_bin = install_into_venv(venv_path, wheel)
+    try:
+        venv_path.parent.mkdir(parents=True, exist_ok=True)
+        monvisor_bin = install_into_venv(venv_path, wheel)
+    except OSError as e:
+        import errno
+        if e.errno == errno.ENOSPC:
+            die(f"No space left on device while creating the venv at {venv_path}. "
+                f"MonVisor needs ~{MIN_FREE_GB} GB free (models + venv); a partial "
+                "model blob from a failed pull may also be taking room. Free space "
+                "(or grow the disk) and re-run install.py.")
+        die(f"Could not create the virtualenv at {venv_path}: {e}")
 
     if not monvisor_bin.exists():
         die("Install finished but the 'monvisor' command was not found in the venv.")

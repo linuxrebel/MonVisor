@@ -1,6 +1,6 @@
 # MonVisor — Project State
 # Location: /mnt/data/git/AI/MonVisor/MD-Files/PROJECT_STATE.md
-# Last updated: 2026-06-02 (end of session — v0.1.0 released, all pushed)
+# Last updated: 2026-06-02 (installer hardened, VM e2e passed on CentOS 10 + Ubuntu)
 # Purpose: Full context for resuming work after context window reset
 
 ---
@@ -85,25 +85,53 @@
 
 ---
 
+## DONE SINCE LAST SESSION (2026-06-02 follow-up)
+
+- Release tarball REBUILT with current (post-relicense / GPL) code.
+- ~/git/mon-proj REMOVED (stale copy).
+- MonVisor-Corpus committed to git AND pushed to GitHub (remote now exists).
+- Published GitHub release asset confirmed = the post-relicense (GPL) rebuild.
+- scripts/bundle_corpus.sh WRITTEN — automates re-bundle steps 4-6
+  (corpus+exemplars copy + manifest pairs/build_date). Steps 2-3 (shard regen)
+  and 7-8 (store reload, artifact rebuild) remain manual by design.
+
+- VM END-TO-END TEST PASSED on a clean box (both distros):
+    - CentOS 10 minimal: clean install, init verified 231 pairs.
+    - Ubuntu 26.04 minimal: clean install, init verified 231/51, "Done".
+    - Exercised the previously-untested branches: Ollama install via official
+      script, zstd extraction, gemma4 + nomic pulls, venv creation.
+
+- INSTALLER HARDENED (scripts/install.py) — three real failure modes found on
+  Ubuntu minimal and fixed:
+    1. venv detection false-positive: was probing `import venv` (pure stdlib,
+       always succeeds on Debian/Ubuntu) instead of `ensurepip` (ships separately
+       in pythonX.Y-venv). EnvBuilder(with_pip=True) needs ensurepip. Now probes
+       ensurepip, installs the version-specific apt package (pythonX.Y-venv) with
+       apt-cache existence check + generic python3-venv fallback, and re-verifies
+       ensurepip in a fresh subprocess after install.
+    2. Disk-full crash: a failed gemma4 pull (no space) let the run continue and
+       then crashed with a raw OSError traceback at venv mkdir. Added a pre-flight
+       free-space warning (MIN_FREE_GB=14) before the long pull, and an ENOSPC
+       guard on venv creation that prints a clean message + exits non-zero.
+    3. Future-proofing note: the pythonX.Y-venv / python3-venv name assumption is
+       documented inline as a known fragility (could break on a future Ubuntu LTS
+       rename); on miss it degrades to an actionable manual-install hint, not a
+       crash. Fix-forward is adding the new name to apt_venv_pkgs.
+  NOTE: these installer fixes are NOT in the published v0.1.0 asset. A user on
+  Ubuntu minimal pulling the current GitHub tarball still hits the ensurepip wall.
+  This is the change that justifies a v0.1.1 (or re-cut) — see PENDING.
+
+---
+
 ## PENDING (NEXT SESSION — pick up from here)
 
 ### High priority
-- REBUILD tarball with current code before any distribution:
-    bash scripts/build_release_tarball.sh
-  (The v0.1.0 release asset was built pre-relicense — the attached tarball's
-  LICENSE may say MIT. Options: re-cut v0.1.0 or roll to v0.1.1.)
-
-- VM end-to-end test (clone-free, real download path):
-    # Need VM with 12-15 GB free disk (prior VM failed on disk size)
-    tar xzf monvisor-0.1.0-install.tar.gz
-    cd monvisor-0.1.0-install && python3 install.py
-    # Should say "Downloading ... from GitHub release" (not 404 fallback)
-    # Ollama-install + zstd branch NOT yet exercised on a real clean box
+- CUT v0.1.1 (or re-cut v0.1.0) carrying the installer fixes. The installer
+  behavior materially changed (Ubuntu-minimal installs now work), so the
+  published asset should be refreshed. Procedure in RELEASE.md.
+    bash scripts/build_release_tarball.sh   # rebuild artifacts first
 
 ### Non-blocking / housekeeping
-- rm -rf ~/git/mon-proj (stale copy; superseded by MonVisor-Corpus)
-- Push MonVisor-Corpus to GitHub (no remote yet)
-- scripts/bundle_corpus.sh — corpus→package copy still manual
 - pyproject.toml: license table format deprecation warning (harmless until 2027)
 
 ### Phase 5 — Paid Features [NEXT MAJOR WORK]
@@ -136,7 +164,8 @@ When corpus changes:
   6. Update monvisor/knowledge/v1.0/manifest.json (pairs count, build_date)
   7. monvisor init --reset-knowledge  (reload the store)
   8. bash scripts/build_release_tarball.sh  (rebuild artifacts)
-  (scripts/bundle_corpus.sh would automate steps 4-6 — not yet written)
+  (scripts/bundle_corpus.sh now automates steps 4-6: corpus+exemplars copy +
+   manifest pairs/build_date. Run it, then do steps 7-8 manually.)
 
 ---
 
@@ -178,6 +207,7 @@ When corpus changes:
 │                                  ask fallback/registration, ingest replace contract
 ├── scripts/
 │   ├── install.py             ← one-shot installer (stdlib only)
+│   ├── bundle_corpus.sh       ← re-bundle corpus into knowledge/ (steps 4-6)
 │   └── build_release_tarball.sh ← builds dist/monvisor-{ver}-install.tar.gz
 ├── MD-Files/
 │   ├── PROJECT_STATE.md       ← this file
@@ -201,8 +231,7 @@ Corpus repo (separate):
 ├── manifest.json              ← corpus build metadata (pinned versions)
 ├── README.md                  ← CC BY-SA 4.0 license + attribution string
 └── LICENSE                    ← CC BY-SA 4.0 (full text)
-NOTE: MonVisor-Corpus has NO GitHub remote yet.
-Stale copy at ~/git/mon-proj — safe to rm -rf.
+NOTE: MonVisor-Corpus is now in git with a GitHub remote.
 
 ---
 
@@ -238,6 +267,6 @@ Dev install: editable (pip install -e .) in system Python
      monvisor knowledge status        # expect 231 / 51
      python3 -m pytest -q             # expect 16 passed
 4. START HERE for next work: "PENDING" section above.
-   - If doing VM test: rebuild tarball first with build_release_tarball.sh
+   - If cutting v0.1.1: rebuild artifacts (build_release_tarball.sh), follow RELEASE.md
    - If doing Phase 5: read ENGINEERING_MAP.md Phase 5 section
-   - If doing corpus update: follow "Knowledge update / re-bundle procedure" above
+   - If doing corpus update: run scripts/bundle_corpus.sh, then steps 7-8

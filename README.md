@@ -34,6 +34,10 @@ scan  ──▶  review  ──▶  generate  ──▶  (deploy: paid)
 - ~12–15 GB free disk for the models
 - `promtool` (optional) for config validation
 
+Tested on Fedora/RHEL/CentOS/Rocky (dnf) and Debian/Ubuntu (apt). The bundled
+installer handles the per-distro differences automatically; see the manual
+steps below if you prefer to install by hand.
+
 ## Install
 
 **Latest release: [v0.1.0](https://github.com/linuxrebel/MonVisor/releases/tag/v0.1.0)** —
@@ -82,7 +86,7 @@ a running Ollama with two models, then the package itself.
 ### 1. System prerequisites
 
 ```bash
-# Fedora / RHEL
+# Fedora / RHEL / CentOS / Rocky
 sudo dnf install python3 python3-pip nmap curl zstd
 
 # Debian / Ubuntu
@@ -92,6 +96,13 @@ sudo apt install python3 python3-pip python3-venv nmap curl zstd
 `nmap` must be on your `PATH` (scanning depends on it). `curl` and `zstd` are
 needed to install Ollama in the next step — the Ollama installer is
 zstd-compressed and fails without it. Python 3.11+ is required.
+
+> **Debian/Ubuntu note:** `python3-venv` is a metapackage that can lag the
+> installed interpreter on minimal images, leaving `venv` unable to bootstrap
+> pip ("ensurepip is not available"). If `python3 -m venv` fails, install the
+> version-specific package instead — e.g. `sudo apt install python3.14-venv`
+> (match the number to `python3 --version`). The bundled installer does this
+> for you automatically.
 
 ### 2. Ollama + models (required before `monvisor init`)
 

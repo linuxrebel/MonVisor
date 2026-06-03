@@ -1,5 +1,5 @@
 # MonVisor — Engineering Product Map
-# Last updated: 2026-06-02 (v0.1.0 released)
+# Last updated: 2026-06-02 (v0.1.0 released; installer hardened for Debian/Ubuntu)
 
 ## Overview
 
@@ -86,7 +86,10 @@ data model, and build roadmap.
 │   └── test_smoke.py            # 16 tests: packaging, CLI, config, schema,
 │                                #   recommend, ask fallback, ingest replace contract
 ├── scripts/
-│   ├── install.py               # One-shot installer (stdlib only)
+│   ├── install.py               # One-shot installer (stdlib only). Probes
+│   │                            #   ensurepip (not venv) + installs pythonX.Y-venv
+│   │                            #   on apt; disk pre-flight + ENOSPC guard.
+│   ├── bundle_corpus.sh         # Re-bundle corpus into knowledge/ (steps 4-6)
 │   └── build_release_tarball.sh # Builds dist/monvisor-{ver}-install.tar.gz
 ├── PLAN.md                      # Build plan (this project)
 ├── ELEVATOR_PITCH.md
@@ -97,7 +100,7 @@ data model, and build roadmap.
 └── INSTALL.md                   # Complete install guide + troubleshooting
 └── RELEASE.md                   # Release checklist + stale-tag procedure
 # MonVisor-Corpus (separate repo, CC BY-SA 4.0):
-/home/james/git/AI/MonVisor-Corpus/  ← no GitHub remote yet
+/home/james/git/AI/MonVisor-Corpus/  ← in git, GitHub remote exists
 
 ---
 
