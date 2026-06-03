@@ -1,4 +1,5 @@
 # MonVisor — Engineering Product Map
+# Last updated: 2026-06-02 (v0.1.0 released)
 
 ## Overview
 
@@ -35,12 +36,13 @@ data model, and build roadmap.
 /mnt/data/git/AI/MonVisor/
 ├── monvisor/
 │   ├── cli/
-│   │   ├── main.py              # Entry point, Click command routing
+│   │   ├── main.py              # Entry point; all commands incl. ask (RAG Q&A)
 │   │   ├── scan.py              # CIDR scan, port detection, service fingerprinting
 │   │   ├── report.py            # Rich terminal report + HTML report generation
-│   │   ├── generate.py          # Config/dashboard generation via RAG + Ollama
-│   │   ├── deploy.py            # SSH push, Grafana API provisioning (Paid)
-│   │   └── update.py            # Knowledge package installer
+│   │   ├── generate.py          # Config generation via RAG + Ollama
+│   │   ├── deploy.py            # SSH push, Grafana API provisioning (Paid/stub)
+│   │   ├── nginx.py             # nginx reverse-proxy config generator
+│   │   └── update.py            # Knowledge package installer (always replace=True)
 │   ├── api/
 │   │   ├── server.py            # FastAPI app, localhost:7373 only
 │   │   ├── routes/
@@ -75,33 +77,27 @@ data model, and build roadmap.
 │   │       ├── style.css        # Minimal, clean styling
 │   │       └── app.js           # Minimal JS for toggle/submit
 │   └── config.py                # Settings, paths, defaults
-├── knowledge/
+├── monvisor/knowledge/      # BUNDLED inside the package (not repo root)
 │   └── v1.0/
-│       ├── corpus.jsonl         # 174 training pairs (repurposed as RAG docs)
-│       ├── exemplars/           # Annotated reference configs
-│       ├── stock_dashboards/    # Pre-built Grafana dashboard JSON
-│       │   ├── mysql.json
-│       │   ├── postgresql.json
-│       │   ├── redis.json
-│       │   ├── nginx.json
-│       │   ├── node_exporter.json
-│       │   ├── kubernetes.json
-│       │   ├── elasticsearch.json
-│       │   └── blackbox.json
-│       └── manifest.json        # Version, changelog, compatibility
+│       ├── corpus.jsonl         # 231 pairs (174 domain + 57 MonVisor self-knowledge)
+│       ├── exemplars/           # 14 annotated reference configs
+│       └── manifest.json        # version, pairs:231, license:CC-BY-SA-4.0
 ├── tests/
-│   ├── test_scan.py
-│   ├── test_rag.py
-│   ├── test_generate.py
-│   └── test_api.py
+│   └── test_smoke.py            # 16 tests: packaging, CLI, config, schema,
+│                                #   recommend, ask fallback, ingest replace contract
 ├── scripts/
-│   ├── build_appimage.sh        # AppImage packaging
-│   └── build_binary.sh          # PyInstaller packaging
+│   ├── install.py               # One-shot installer (stdlib only)
+│   └── build_release_tarball.sh # Builds dist/monvisor-{ver}-install.tar.gz
 ├── PLAN.md                      # Build plan (this project)
 ├── ELEVATOR_PITCH.md
 ├── PRODUCT_OVERVIEW.md
 ├── ENGINEERING_MAP.md           # This document
-└── pyproject.toml               # Package definition, dependencies
+└── pyproject.toml               # Package definition, GPL-3.0-or-later
+└── LICENSE                      # GPL-3.0 full text
+└── INSTALL.md                   # Complete install guide + troubleshooting
+└── RELEASE.md                   # Release checklist + stale-tag procedure
+# MonVisor-Corpus (separate repo, CC BY-SA 4.0):
+/home/james/git/AI/MonVisor-Corpus/  ← no GitHub remote yet
 
 ---
 
@@ -266,7 +262,19 @@ monvisor generate prod
   → Print summary + file paths
 ```
 
-### 6. Deploy (Paid)
+### 6. Ask (RAG Q&A)
+```
+monvisor ask "<question>"
+  → retrieve() from 'pairs' collection (n=1 for pre-filter, n=4 for context)
+  → Layer 1: distance pre-filter (_ASK_MAX_DISTANCE=0.40) — skip LLM on obvious misses
+  → Layer 2: build_context() → Ollama prompt with INSUFFICIENT_CONTEXT sentinel
+  → Hit: print natural language answer (grounded in knowledge base only)
+  → Miss (either layer): "I've not yet learned how to do that"
+             + https://github.com/linuxrebel/MonVisor/issues
+  → --show-sources: print distance scores of retrieved pairs
+```
+
+### 7. Deploy (Paid)
 ```
 monvisor deploy prod
   → Load latest generated configs for environment
@@ -320,21 +328,23 @@ Secondary fingerprinting via HTTP response headers and path probing
 
 ```
 Knowledge Package (corpus.jsonl + exemplars/)
-        ↓ ingest.py
+        ↓ ingest.py (replace=True for init/update; replace=False for append)
 ChromaDB collections:
-  'pairs'      ← 174 instruction/output pairs
-  'exemplars'  ← annotated reference configs
-  'dashboards' ← stock dashboard JSON with metadata
+  'pairs'      ← 231 instruction/output pairs (domain + MonVisor self-knowledge)
+  'exemplars'  ← annotated reference configs (51 chunks / 14 files)
+  store.reset_collection(name) ← drops + recreates before a replacing ingest
         ↓ query.py
 Retrieval:
   1. Embed user query via nomic-embed-text
-  2. Similarity search → top 5 relevant chunks
+  2. Similarity search → top N relevant chunks (n_pairs=4, n_exemplars=2 for ask)
   3. Assemble context block
-  4. Inject into Ollama prompt with service details
+  4. For generate: inject into Ollama prompt with discovered service details
+     For ask: two-layer gate (distance pre-filter 0.40 + INSUFFICIENT_CONTEXT sentinel)
         ↓
-Ollama (Gemma4)
+Ollama (gemma4:latest — VERIFIED REAL MODEL, 9.6GB)
         ↓
-YAML output → validate → write to disk
+generate: YAML output → validate → write to disk
+ask:      natural language answer → print; or "I've not yet learned how to do that"
 ```
 
 ---
@@ -418,14 +428,14 @@ server {
 - ✓ Package installed system-wide (pip install -e .)
 - Fixes: Ollama API version-safe detection, exemplar chunking (1400 char max)
 
-### Phase 2 — Discovery [NEXT]
+### Phase 2 — Discovery [COMPLETE]
 - CIDR scan with python-nmap
 - Service fingerprinting (port → service type, HTTP probing)
 - Rich terminal report
 - HTML report generation → ~/.monvisor/reports/
 - monvisor scan command (currently stub)
 
-### Phase 3 — Review + Generate
+### Phase 3 — Review + Generate [COMPLETE]
 - Terminal review workflow (CLI yes/no per service)
 - Web UI (FastAPI + Jinja2 templates)
 - Simple bcrypt auth on web UI
@@ -434,14 +444,14 @@ server {
 - monvisor review and monvisor generate commands
 - monvisor ui command
 
-### Phase 4 — Polish + Package
+### Phase 4 — Polish + Package [COMPLETE]
 - Nginx config auto-generation
 - SSH tunnel detection + auto-print instructions
 - AppImage packaging
 - Knowledge update installer
 - monvisor knowledge update command
 
-### Phase 5 — Paid Features
+### Phase 5 — Paid Features [NEXT — not yet started]
 - SSH deploy
 - Grafana dashboard provisioning
 - Custom dashboard generation

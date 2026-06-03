@@ -1,366 +1,142 @@
 # MonVisor — Project State
 # Location: /mnt/data/git/AI/MonVisor/MD-Files/PROJECT_STATE.md
-# Last updated: 2026-06-02 (Phase 4.6: ask command, install.py, docs, v0.1.0 release prep)
+# Last updated: 2026-06-02 (end of session — v0.1.0 released, all pushed)
 # Purpose: Full context for resuming work after context window reset
+
+---
+
+## CURRENT STATUS AT END OF 2026-06-02 SESSION
+
+### Git / Release
+- HEAD = origin/main = 7d2cf6c ("README: link to v0.1.0 release")
+- FULLY PUSHED — local and remote are in sync, zero unpushed commits
+- Tag v0.1.0 is on commit 4533813 (slightly behind HEAD — doc-only delta, harmless)
+- v0.1.0 GitHub Release is LIVE: https://github.com/linuxrebel/MonVisor/releases/tag/v0.1.0
+  - Assets: monvisor-0.1.0-install.tar.gz + monvisor-0.1.0-py3-none-any.whl
+  - Release notes published (Hacker News tone, features listed, GPL-3.0/CC-BY-SA noted)
+- dist/ contains: monvisor-0.1.0-install.tar.gz + monvisor-0.1.0-py3-none-any.whl
+
+### Licenses
+- MonVisor (code): GPL-3.0-or-later (changed from MIT this session)
+- MonVisor-Corpus (data): CC BY-SA 4.0 (set this session)
+- Attribution string: "MonVisor-Corpus" by James Sparenberg, licensed CC BY-SA 4.0
+  https://github.com/linuxrebel/MonVisor-Corpus
+
+### Knowledge / RAG (on Bairn dev box)
+- Pairs: 231 (174 domain + 57 MonVisor self-knowledge)
+- Exemplars: 51 chunks (14 files)
+- Bundled in: monvisor/knowledge/v1.0/corpus.jsonl + exemplars/ + manifest.json
+
+### Tests
+- 16/16 passing
+
+---
+
+## WHAT WAS BUILT THIS SESSION (Phase 4.6)
+
+1. MonVisor self-knowledge corpus shard (57 pairs / 19 topics):
+   - MonVisor-Corpus/scripts/build_monvisor_shard.py generates corpus/monvisor.jsonl
+   - Covers: all commands, workflow, free/paid boundary, troubleshooting,
+     privacy, feedback URL, examples-vs-generate teaching distinction
+   - Folded into combined.jsonl (174→231), re-bundled into the package
+
+2. `monvisor ask "<question>"` command:
+   - RAG Q&A over local knowledge base (same build_context + Ollama path as generate)
+   - Two-layer relevance gate: distance pre-filter (0.40) + LLM INSUFFICIENT_CONTEXT sentinel
+   - Fallback: "I've not yet learned how to do that" + GitHub issues URL
+   - --show-sources flag; tested live (in-domain / out-of-domain / teaching boundary)
+
+3. Knowledge-store orphaning bug FIXED:
+   - store.reset_collection(); ingest_corpus/exemplars take replace= param
+   - init replaces when store exists or --reset-knowledge passed
+   - knowledge update always replaces (backup still provides rollback)
+   - Verified: A+B bug reproduced then fixed
+
+4. init false-success FIXED:
+   - Tracks knowledge_ok; empty store → "Incomplete" panel + sys.exit(1)
+   - Actionable error message names Ollama/embed-model as cause
+   - --reset-knowledge flag added
+
+5. scripts/install.py — one-shot installer (stdlib only):
+   - Ensures nmap + curl + zstd + python venv (re-verifies after install)
+   - Installs Ollama via consent prompt (--install-ollama / --no-install-ollama)
+   - Starts Ollama (systemctl or background), waits for :11434
+   - Pulls nomic-embed-text first, then gemma4
+   - Finds wheel: local (script dir / CWD / dist/) FIRST, GitHub release fallback
+   - Creates venv at ~/.venvs/monvisor, installs, runs init
+   - Post-init: verifies knowledge pairs > 0; reports "Done" or "Incomplete"
+
+6. scripts/build_release_tarball.sh:
+   - Builds wheel + assembles install.tar.gz (install.py + wheel + INSTALL.md + LICENSE)
+   - Extracts into monvisor-{version}-install/; run with: bash scripts/build_release_tarball.sh
+
+7. Docs written/updated:
+   - README.md: full install rewrite (curl/zstd prereqs, release tarball path, alias/deactivate)
+   - INSTALL.md: complete clone-to-running guide + troubleshooting (all real failure modes)
+   - RELEASE.md: repeatable release checklist + realign-stale-tag procedure
+   - GPL/CC-BY-SA licensing in README, pyproject, source headers, manifests
+
+8. Relicensed GPL-3.0-or-later:
+   - GPL notice header on all 18 source files + 2 scripts
+   - pyproject classifier updated
+   - MonVisor-Corpus: CC BY-SA 4.0 + attribution string in README
+
+9. Press release / HN announcement post drafted (in chat; not committed to repo)
+
+---
+
+## PENDING (NEXT SESSION — pick up from here)
+
+### High priority
+- REBUILD tarball with current code before any distribution:
+    bash scripts/build_release_tarball.sh
+  (The v0.1.0 release asset was built pre-relicense — the attached tarball's
+  LICENSE may say MIT. Options: re-cut v0.1.0 or roll to v0.1.1.)
+
+- VM end-to-end test (clone-free, real download path):
+    # Need VM with 12-15 GB free disk (prior VM failed on disk size)
+    tar xzf monvisor-0.1.0-install.tar.gz
+    cd monvisor-0.1.0-install && python3 install.py
+    # Should say "Downloading ... from GitHub release" (not 404 fallback)
+    # Ollama-install + zstd branch NOT yet exercised on a real clean box
+
+### Non-blocking / housekeeping
+- rm -rf ~/git/mon-proj (stale copy; superseded by MonVisor-Corpus)
+- Push MonVisor-Corpus to GitHub (no remote yet)
+- scripts/bundle_corpus.sh — corpus→package copy still manual
+- pyproject.toml: license table format deprecation warning (harmless until 2027)
+
+### Phase 5 — Paid Features [NEXT MAJOR WORK]
+- SSH config deploy
+- Grafana dashboard provisioning API
+- Custom AI-generated dashboards
+- Grafana review UI
+- Enterprise auth stubs (LDAP, Duo, IAM, SAML)
 
 ---
 
 ## DESIGN NOTES / BACKLOG
 
+### Paid tier / code isolation warning
+GPL-3.0 covers this repo. DO NOT build paid features in this codebase and
+expect to keep them closed-source. Paid features should live in a separate
+private repo that is NOT GPL'd, and call/wrap MonVisor as a dependency.
+
 ### Agentless monitoring via blackbox_exporter
-For hosts where we cannot install an exporter (appliances, locked-down
-devices, third-party boxes), fall back to remote/agentless probing with
-blackbox_exporter (HTTP/HTTPS/TCP/ICMP modules).
+IMPLEMENTED (2026-06-01). Review offers 'b' = blackbox. Generate produces
+blackbox scrape jobs for hosts with no SSH/exporter path detected.
 
-Heuristic for "can't put an agent here":
-  - No openssh detected on any port for that host
-    → assume no install path → flag host as blackbox-only.
-  - generate should then emit a blackbox scrape job (module per probe type:
-    http_2xx for web ports, tcp_connect for open TCP, icmp for liveness)
-    targeting that host instead of expecting a /metrics endpoint.
-
-Implementation sketch (future, likely Phase 3.5 / generate enhancement):
-  - In scan: record per-host whether openssh (or other admin path) was seen.
-  - In generate: for monitored hosts with no scrapeable exporter AND no ssh,
-    build a blackbox job using the blackbox_exporter target found on the
-    network (or note that one must be deployed).
-  - Surface in review UI: tag such services "remote-probe only".
-  - RAG already has blackbox exemplars — use them for the probe config.
-
-Status: IMPLEMENTED (manual path, 2026-06-01). Review offers 'b' = blackbox/
-not installable; generate emits blackbox_<module> jobs (http_2xx/https_2xx/
-tcp_connect chosen by port) relabelled through a blackbox_exporter (discovered
-instance, else 'blackbox-url' setting, else 127.0.0.1:9115). Exporter
-recommendations show in terminal + HTML report (monvisor/recommend.py).
-DB: services.monitor_mode column added via additive migration in schema.py.
-STILL PENDING: automatic "no openssh on host -> auto-flag blackbox" heuristic
-(currently user-driven via the review 'b' choice).
-
-### Report suspected OS of discovered devices
-The scan report should announce the suspected OS per host.
-
-Notes:
-  - nmap OS fingerprinting (-O) is most accurate but requires root; our scan
-    runs unprivileged (-sT), so -O is not available by default.
-  - Cheap signal already on hand: service banners from -sV often leak the OS
-    (e.g. openssh "9.2p1 Debian 2+deb12u9" → Debian 12; lighttpd/dnsmasq
-    versions hint at appliance/embedded). Derive a best-guess from banners.
-  - Optionally offer an opt-in privileged scan (sudo) that adds -O for a
-    real OS match when the user can run it.
-  - Store suspected_os per host (new column on a hosts table, or aggregate
-    onto the discovery) and show it in both terminal and HTML reports.
-  - Tie-in: a confident "Debian/Linux" guess also informs the blackbox vs.
-    agent decision above (Linux + ssh → installable; embedded/no ssh → blackbox).
-
-Status: NOT YET IMPLEMENTED — design note only.
-
----
-
-## WHAT WAS BUILT (COMPLETED)
-
-### Monitoring Corpus — /mnt/data/git/mon-proj/
-A 174-pair instruction-tuning corpus for Prometheus/Alertmanager/Grafana.
-REPURPOSED as the RAG knowledge base for MonVisor.
-
-Corpus files:
-  train/train.jsonl          — 156 pairs (primary RAG source)
-  train/eval.jsonl           — 18 pairs
-  corpus/combined.jsonl      — all 174 pairs merged
-  exemplars/                 — annotated reference configs (8 files + grafana_provisioning/)
-  README.md                  — corpus documentation
-
-Versions pinned: Prometheus 3.12.0, Alertmanager 0.32.1, Grafana 13.0.1
-
----
-
-## THE PRODUCT — MonVisor
-
-### Product documents — /mnt/data/git/AI/MonVisor/
-  MD-Files/PROJECT_STATE.md    ← this file
-  MD-Files/ENGINEERING_MAP.md  ← full technical architecture (KEY REFERENCE)
-  MD-Files/ELEVATOR_PITCH.md   ← business pitch (md)
-  MD-Files/PRODUCT_OVERVIEW.md ← executive overview (md)
-  docs/Elevator-Pitch.docx
-  docs/Product-Overview.docx
-  docs/Engineering-Map.docx
-
----
-
-## LOCKED ARCHITECTURE DECISIONS
-
-Language:        Python 3.11+
-LLM:             Ollama + Gemma4 (model-agnostic later)
-Embedding:       nomic-embed-text via Ollama
-RAG store:       ChromaDB (LlamaIndex-ready for later upgrade)
-API:             FastAPI, on-demand, localhost:7373 only
-Web:             Jinja2 + vanilla CSS/JS (no framework)
-State:           SQLite (~/.monvisor/state.db)
-Auth now:        bcrypt + session tokens
-Auth later:      Pluggable interface — LDAP, Duo, AWS IAM, SAML
-Reverse proxy:   Nginx (auto-configured by monvisor init)
-Packaging:       AppImage (Linux primary), PyInstaller (Mac/Windows)
-Port scanning:   python-nmap
-
----
-
-## TIER STRUCTURE
-
-Free tier (CLI):
-  - CIDR scan + service discovery
-  - Terminal report (rich) + HTML report
-  - Simple web review UI (Yes/No per service)
-  - Prometheus, Alertmanager, rules YAML generation
-  - Stock Grafana dashboards (view/import manually)
-  - RAG knowledge base updates via packages
-
-Paid tier (Professional):
-  - Grafana-native review UI
-  - Automated config deploy via SSH
-  - Custom AI-generated Grafana dashboards
-  - Stock dashboard auto-provisioning via Grafana API
-  - Enterprise auth (LDAP, Duo, AWS IAM, SAML)
-  - Web UI branding
-
----
-
-## DATA MODEL
-
-Data directory: ~/.monvisor/
-  config.yml     — Grafana URL, Ollama URL, auth config, tier
-  state.db       — SQLite
-  chroma/        — ChromaDB vector store
-  reports/       — Generated HTML reports
-  configs/       — Generated YAML files
-  knowledge/     — Installed RAG knowledge packages
-    v1.0/
-      corpus.jsonl
-      exemplars/
-      stock_dashboards/
-      manifest.json
-
-Key SQLite tables:
-  environments  (id, name, prometheus_url, grafana_url)
-  cidrs         (id, env_id, cidr, label)
-  discoveries   (id, env_id, scan_time, cidr, raw_findings JSON)
-  services      (id, discovery_id, env_id, host, port, service_type, version, monitor BOOL)
-  configs       (id, env_id, config_type, content, generated_at, deployed_at)
-  dashboards    (id, env_id, name, source, service_type, content JSON)
-  sessions      (id, created_at, expires_at)
-  settings      (key, value)
-
----
-
-## CLI COMMANDS
-
-monvisor init                              # setup, load knowledge, set password
-monvisor env add prod 192.168.1.0/24       # create named environment with CIDR
-monvisor env add-cidr prod 192.168.2.0/24  # add CIDR to existing environment
-monvisor env list                          # list all environments
-monvisor scan prod                         # scan all CIDRs in environment
-monvisor scan prod --new-only              # only scan new hosts
-monvisor review prod                       # interactive CLI yes/no review
-monvisor generate prod                     # generate YAML configs via RAG+Ollama
-monvisor deploy prod                       # SSH push configs (paid)
-monvisor ui prod                           # launch web UI (FastAPI)
-monvisor knowledge status                  # show RAG store counts
-monvisor knowledge update v1.1.pkg        # install knowledge package update
-monvisor config set grafana-url https://grafana.company.com
-
----
-
-## ACCESS MODEL
-
-Engineer:         SSH → server → CLI commands
-Dashboard users:  Browser → Nginx :443 → Grafana (URL configurable)
-Review/approval:  Browser → Nginx :443 → /monvisor/ → MonVisor web UI
-Remote detection: SSH tunnel instructions auto-printed when no display detected
-
----
-
-## BUILD PHASES
-
-### PHASE 1 — Foundation [COMPLETE]
-  ✓ Project scaffold, pyproject.toml, Click CLI entry point
-  ✓ SQLite schema + all tables + query functions
-  ✓ monvisor init command (working)
-  ✓ Knowledge corpus ingested into ChromaDB (275 pairs + 51 exemplars)
-  ✓ bcrypt auth (SimpleAuthProvider)
-  ✓ RAG query verification passing
-  ✓ All CLI command stubs registered
-  ✓ nomic-embed-text pulled and working
-  ✓ Package installed system-wide (pip install -e .)
-
-  Known fixes applied during Phase 1:
-  - Ollama client API version-safe model list detection
-  - nomic-embed-text 2048 token limit — exemplars chunked to 1400 chars max
-
-### PHASE 2 — Discovery [COMPLETE]
-  ✓ CIDR scan with python-nmap (cli/scan.py) — -sT -sV --open, no root needed
-  ✓ Service fingerprinting (FINGERPRINTS port map + nmap product fallback)
-  ✓ HTTP probing for secondary fingerprinting (/metrics, /-/healthy, /api/health)
-  ✓ Version extraction from *_build_info metrics
-  ✓ Rich terminal report grouped by host (cli/report.py)
-  ✓ HTML report generation → ~/.monvisor/reports/<env>-<ts>.html
-  ✓ monvisor scan command wired (--new-only, --no-html flags)
-
-  New files: monvisor/cli/scan.py, monvisor/cli/report.py
-  All three (scan/report/main) py_compile clean.
-  Note: requires nmap binary on PATH (sudo dnf install nmap).
-
-### PHASE 3 — Review + Generate [COMPLETE]
-  ✓ Terminal review workflow (cli/review.py) — y/n/s/a/q per service
-  ✓ FastAPI web UI (api/server.py) + Jinja2 templates + static css/js
-  ✓ bcrypt session-cookie auth on web UI (SimpleAuthProvider, httponly cookie)
-  ✓ Web review: env list, per-env Yes/No toggles, generate trigger
-  ✓ Config generation (cli/generate.py): deterministic prometheus.yml +
-    RAG+Ollama rules.yml, YAML validation, best-effort promtool check
-  ✓ monvisor review / generate / ui commands wired
-  ✓ ui detects headless session → prints SSH tunnel instructions
-
-  New files:
-    monvisor/cli/review.py, monvisor/cli/generate.py
-    monvisor/api/server.py
-    monvisor/web/templates/{base,login,index,report}.html
-    monvisor/web/static/{style.css,app.js}
-  All py_compile clean. Web deps (fastapi/uvicorn/jinja2) already installed.
-  Note: generate's rules.yml needs Ollama running; prometheus.yml is
-  deterministic and always produced. promtool check skipped if not on PATH.
-
-### PHASE 4 — Polish + Package [COMPLETE]
-  ✓ Nginx config generation (cli/nginx.py) — prints + offers to write with
-    confirm; falls back to ~/.monvisor/monvisor.conf if /etc/nginx not writable
-  ✓ monvisor nginx [env] command (--print-only); grafana_url resolved from
-    env → setting → default; init prints a pointer to it
-  ✓ SSH tunnel detection (already in cli ui from Phase 3)
-  ✓ Knowledge update installer (cli/update.py): manifest validation,
-    path-traversal guard, chroma backup → chroma.bak, reuses ingest_corpus/
-    ingest_exemplars, copies payload to ~/.monvisor/knowledge/v<ver>/,
-    records knowledge_version, prints changelog
-  ✓ monvisor knowledge update <pkg> wired
-  ✓ AppImage build scaffold (scripts/build_appimage.sh) — SCAFFOLD ONLY,
-    bash -n clean; documents nmap/Ollama as external (unbundled) deps
-
-  New files:
-    monvisor/cli/nginx.py, monvisor/cli/update.py
-    scripts/build_appimage.sh
-  All py_compile clean; build script passes bash -n.
-  Note: AppImage not yet built/verified end-to-end (scaffold). PyInstaller
-  path (scripts/build_binary.sh) for Mac/Win still pending.
-
-### PHASE 4.5 — Packaging / Distribution [COMPLETE]
-  ✓ RAG knowledge (corpus.jsonl + exemplars/) bundled INSIDE the package at
-    monvisor/knowledge/v1.0/ — init is now self-contained, no external mon-proj
-    checkout required.
-  ✓ config.py resolves corpus/exemplars bundle-first: env override
-    (MONVISOR_CORPUS / MONVISOR_EXEMPLARS) → bundled → mon-proj dev fallback.
-  ✓ pyproject.toml: [tool.setuptools.package-data] ships knowledge + web
-    templates/static in the wheel; include-package-data + MANIFEST.in for sdist;
-    metadata added (license=MIT, authors, classifiers); setuptools>=64.
-  ✓ Added README.md (was referenced by pyproject but missing → clean builds had
-    been failing), LICENSE (MIT), .gitignore.
-  ✓ Git: previously-UNTRACKED source tree (monvisor/, pyproject.toml, scripts/)
-    is now committed. Vestigial empty root knowledge/ removed.
-  ✓ Verified: `python -m build` produces wheel + sdist; both contain corpus,
-    all 14 exemplars, 6 web assets. Fresh venv install (--no-deps) resolves the
-    bundled corpus from site-packages and installs the `monvisor` entry point.
-  ✓ Minimal smoke tests added under tests/ (packaging + CLI wiring).
-
-  Bug fixed during this phase: bundled-path lookup used knowledge/1.0 while the
-  dir is v1.0, so it silently fell back to the dev path until corrected.
-
-  STILL PENDING: no git remote yet (push when ready). AppImage/PyInstaller
-  remain scaffolds. Deploy + paid features are Phase 5.
-
-### PHASE 4.6 — Ask command, installer, docs, release prep [IN PROGRESS, 2026-06-02]
-  ✓ MonVisor self-knowledge added to corpus: 57 pairs / 19 topics covering how
-    to USE MonVisor (commands, workflow, free/paid boundary, troubleshooting,
-    privacy, feedback via GitHub issues, examples-vs-generate teaching).
-    Generated by MonVisor-Corpus/scripts/build_monvisor_shard.py (CLI-derived;
-    regenerate when commands change). Corpus 174 -> 231 pairs.
-  ✓ 'monvisor ask "<question>"' command (cli/main.py): RAG Q&A over the local
-    knowledge base, reusing generate's build_context + Ollama path. Two-layer
-    relevance gate: distance pre-filter (_ASK_MAX_DISTANCE=0.40) + model-side
-    INSUFFICIENT_CONTEXT sentinel. Fallback on miss: "I've not yet learned how
-    to do that" + https://github.com/linuxrebel/MonVisor/issues. --show-sources.
-  ✓ Knowledge-store orphaning bug FIXED: ingest used content-hash upsert, so
-    re-ingesting a different corpus left orphaned docs (dev store hit 275 vs 231
-    real). store.reset_collection(); ingest_corpus/exemplars take replace=;
-    init replaces when a store exists or --reset-knowledge; knowledge update
-    always replaces. Verified: replace=False over A->A+B (bug), replace=True->B.
-  ✓ init no longer fake-succeeds: tracks knowledge_ok; empty store -> "Incomplete"
-    panel + non-zero exit + actionable Ollama/embed-model fix, not green "Ready".
-  ✓ scripts/install.py — one-shot installer (stdlib only). Installs system prereqs
-    (nmap, curl, zstd, python venv) and RE-verifies them; installs Ollama via
-    official script behind a consent prompt (--install-ollama/--no-install-ollama),
-    starts it, waits for :11434, pulls nomic-embed-text + gemma4; creates venv at
-    ~/.venvs/monvisor; installs wheel (GitHub release, fallback local dist/);
-    runs init; post-init verifies knowledge>0. Found-the-hard-way fixes:
-    zstd is required (Ollama installer is zstd-compressed), curl re-verify.
-  ✓ Docs: README install section rewritten (prereqs incl curl/zstd, disk budget,
-    wheel/clone paths). INSTALL.md (clone-to-running walkthrough + troubleshooting:
-    empty store, zstd error, out-of-disk on model pull). RELEASE.md (repeatable
-    release checklist + realign-stale-tag procedure with safety caveat).
-  ✓ Tests 11 -> 16 (ask registration/fallback, init reset flag, ingest replace
-    signatures, reset_collection present). All pass.
-  ✓ Corpus is now its OWN repo: /home/james/git/AI/MonVisor-Corpus (git init'd,
-    branch main, 1 commit). 174 train + eval + 28 shards + exemplars + manifest.
-
-  Bundled knowledge now: monvisor/knowledge/v1.0/ = corpus.jsonl (231 pairs) +
-  exemplars (14) + manifest.json (pairs:231).
-
-  *** IMPORTANT — model name: OLLAMA_MODEL = "gemma4:latest" is CORRECT and REAL.
-  (Earlier mistakenly flagged as nonexistent; verified in Ollama registry, 9.6GB.)
-
-  *** RELEASE STATE AT END OF 2026-06-02 SESSION ***
-  - Local HEAD: d4dcbb4 (this PROJECT_STATE update; 573af0e was the prior tip
-    with RELEASE.md). ~10 commits AHEAD of origin.
-  - Local tag v0.1.0 was realigned onto 573af0e during the session. Because this
-    doc commit (d4dcbb4) is now the tip, EITHER move the tag to d4dcbb4 before
-    releasing (git tag -d v0.1.0 && git tag -a v0.1.0 -m "MonVisor 0.1.0"), or
-    accept v0.1.0 on 573af0e (the docs are the only diff — harmless either way).
-  - dist/ has FRESH built artifacts: monvisor-0.1.0-py3-none-any.whl (+ .tar.gz),
-    wheel verified to contain 231-pair corpus.
-  - origin/main is STALE at 747d149. Remote tag v0.1.0 still on old commit.
-  - NO GitHub release published yet (asset URL returns 404).
-  - MonVisor-Corpus has NO remote yet.
-
-  *** NEXT SESSION — FINISH THE v0.1.0 RELEASE (run on Bairn; needs GitHub auth):
-    cd ~/git/AI/MonVisor
-    git push origin main
-    git push origin :refs/tags/v0.1.0      # delete stale remote tag (ok if it errors "doesn't exist")
-    git push origin v0.1.0                  # push realigned tag
-    gh release create v0.1.0 \
-      dist/monvisor-0.1.0-py3-none-any.whl dist/monvisor-0.1.0.tar.gz \
-      --title "MonVisor 0.1.0" \
-      --notes "Free-tier CLI: scan, review, generate, ask. Self-contained 231-pair
-    knowledge base bundled. Requires Ollama (gemma4 + nomic-embed-text) and nmap. See INSTALL.md."
-    # verify the installer's download URL is live (expect 200):
-    curl -fsSL -o /dev/null -w "%{http_code}\n" \
-      https://github.com/linuxrebel/MonVisor/releases/download/v0.1.0/monvisor-0.1.0-py3-none-any.whl
-  If dist/ was wiped: rm -rf dist build && python -m build  (then re-verify 231 pairs).
-  If gh says release exists but asset 404'd: it's a draft/empty — upload assets or delete+recreate.
-
-  *** THEN — VM end-to-end test (clone-free, the real download path):
-    # VM needs 12-15 GB free disk (gemma4 ~9.6GB). PRIOR VM FAILED on disk size.
-    curl -fsSLO https://raw.githubusercontent.com/linuxrebel/MonVisor/main/scripts/install.py
-    python3 install.py
-    source ~/.venvs/monvisor/bin/activate
-    monvisor knowledge status      # expect 231 / 14
-    monvisor ask "how do I run a scan"
-  Watch: install.py should say "Downloading ... from GitHub release" (NOT the 404
-  fallback). The Ollama-install + missing-zstd branch has NOT been exercised on a
-  real clean box yet — this VM test is its first true run.
-
-  STILL PENDING (non-blocking): rm -rf ~/git/mon-proj (stale corpus copy, now
-  superseded by MonVisor-Corpus). scripts/bundle_corpus.sh (corpus->package copy
-  still manual). Push MonVisor-Corpus to a remote. AppImage/PyInstaller scaffolds.
-
-### PHASE 5 — Paid Features [NEXT]
-  - SSH config deploy
-  - Grafana dashboard provisioning API
-  - Custom dashboard generation
-  - Grafana review UI
-  - Enterprise auth stubs (LDAP, Duo, IAM, SAML)
+### Knowledge update / re-bundle procedure
+When corpus changes:
+  1. Edit MonVisor-Corpus/corpus/ shards
+  2. Run: python3 MonVisor-Corpus/scripts/build_monvisor_shard.py  (if MonVisor shard changed)
+  3. Regenerate combined.jsonl (append or rebuild)
+  4. cp MonVisor-Corpus/corpus/combined.jsonl monvisor/knowledge/v1.0/corpus.jsonl
+  5. cp -r MonVisor-Corpus/exemplars monvisor/knowledge/v1.0/exemplars
+  6. Update monvisor/knowledge/v1.0/manifest.json (pairs count, build_date)
+  7. monvisor init --reset-knowledge  (reload the store)
+  8. bash scripts/build_release_tarball.sh  (rebuild artifacts)
+  (scripts/bundle_corpus.sh would automate steps 4-6 — not yet written)
 
 ---
 
@@ -368,94 +144,100 @@ Remote detection: SSH tunnel instructions auto-printed when no display detected
 
 /mnt/data/git/AI/MonVisor/
 ├── monvisor/
-│   ├── __init__.py
-│   ├── config.py              ← paths, defaults, FINGERPRINTS dict, ensure_dirs()
+│   ├── config.py              ← paths, defaults, FINGERPRINTS, OLLAMA_*, ensure_dirs()
 │   ├── cli/
-│   │   ├── __init__.py
-│   │   └── main.py            ← Click CLI, all commands (scan/review/generate are stubs)
-│   ├── api/
-│   │   ├── __init__.py
-│   │   └── routes/
-│   │       └── __init__.py
+│   │   ├── main.py            ← all commands: init/scan/review/generate/ask/ui/
+│   │   │                        deploy/nginx/env/config/knowledge
+│   │   ├── scan.py            ← nmap + fingerprinting
+│   │   ├── report.py          ← terminal + HTML reports
+│   │   ├── review.py          ← terminal review (y/n/b/s/a/q)
+│   │   ├── generate.py        ← RAG + Ollama → YAML
+│   │   ├── nginx.py           ← nginx config generator
+│   │   └── update.py          ← knowledge update (always replace=True)
 │   ├── rag/
-│   │   ├── __init__.py
-│   │   ├── store.py           ← ChromaDB client + collection management
+│   │   ├── store.py           ← ChromaDB client; get_or_create + reset_collection()
 │   │   ├── embed.py           ← nomic-embed-text via Ollama
-│   │   ├── ingest.py          ← corpus + exemplar ingestion with chunking
+│   │   ├── ingest.py          ← ingest_corpus/exemplars(replace=False)
 │   │   └── query.py           ← retrieve() + build_context() + verify_rag()
 │   ├── auth/
-│   │   ├── __init__.py
-│   │   ├── base.py            ← AuthProvider abstract class
-│   │   └── simple.py          ← bcrypt implementation
+│   │   ├── base.py            ← AuthProvider abstract
+│   │   └── simple.py          ← bcrypt + session tokens
 │   ├── db/
-│   │   ├── __init__.py
 │   │   ├── schema.py          ← SQLite schema + init_db() + get_conn()
-│   │   └── queries.py         ← all typed query functions
-│   └── web/
-│       ├── __init__.py
-│       ├── templates/         ← empty (Phase 3)
-│       └── static/            ← empty (Phase 3)
-├── knowledge/                 ← REMOVED (bundled into monvisor/knowledge/v1.0/)
-├── tests/                     ← smoke tests (packaging + CLI wiring)
-├── scripts/                   ← empty (Phase 4 packaging)
+│   │   └── queries.py         ← typed query functions
+│   ├── web/
+│   │   ├── templates/         ← FastAPI/Jinja2 templates
+│   │   └── static/            ← CSS/JS assets
+│   └── knowledge/
+│       └── v1.0/
+│           ├── corpus.jsonl   ← 231 pairs (bundled RAG knowledge)
+│           ├── exemplars/     ← 14 annotated reference configs
+│           └── manifest.json  ← version, pairs:231, license:CC-BY-SA-4.0
+├── tests/
+│   └── test_smoke.py          ← 16 tests: packaging, CLI, config, schema, recommend,
+│                                  ask fallback/registration, ingest replace contract
+├── scripts/
+│   ├── install.py             ← one-shot installer (stdlib only)
+│   └── build_release_tarball.sh ← builds dist/monvisor-{ver}-install.tar.gz
 ├── MD-Files/
 │   ├── PROJECT_STATE.md       ← this file
 │   ├── ENGINEERING_MAP.md
-│   ├── ELEVATOR_PITCH.md
-│   └── PRODUCT_OVERVIEW.md
-├── docs/
-│   ├── Elevator-Pitch.docx
-│   ├── Product-Overview.docx
-│   └── Engineering-Map.docx
-└── pyproject.toml
+│   └── (other docs)
+├── INSTALL.md                 ← full install guide + troubleshooting
+├── RELEASE.md                 ← release checklist + stale-tag procedure
+├── README.md                  ← project overview, links to v0.1.0 release
+├── LICENSE                    ← GPL-3.0-or-later (full text)
+└── pyproject.toml             ← version=0.1.0, GPL-3.0-or-later classifier
+
+Corpus repo (separate):
+/home/james/git/AI/MonVisor-Corpus/
+├── corpus/
+│   ├── combined.jsonl         ← 231 pairs (all shards + monvisor shard)
+│   ├── monvisor.jsonl         ← 57 MonVisor self-knowledge pairs
+│   └── *.jsonl                ← 28 domain shards (prometheus, alertmanager, etc.)
+├── exemplars/                 ← 14 annotated reference configs
+├── scripts/
+│   └── build_monvisor_shard.py ← generates corpus/monvisor.jsonl from CLI --help
+├── manifest.json              ← corpus build metadata (pinned versions)
+├── README.md                  ← CC BY-SA 4.0 license + attribution string
+└── LICENSE                    ← CC BY-SA 4.0 (full text)
+NOTE: MonVisor-Corpus has NO GitHub remote yet.
+Stale copy at ~/git/mon-proj — safe to rm -rf.
 
 ---
 
 ## ENVIRONMENT
 
-OS:       Fedora Linux 44
-Machine:  Bairn (james)
-GPU:      NVIDIA GeForce RTX 3050 4GB Laptop
+OS:       Fedora Linux 44 (KDE Plasma)
+Machine:  Bairn (james), hostname bairn
+GPU:      NVIDIA RTX 3050 4GB + Intel Iris Xe
 RAM:      31GB
 Python:   3.14.5 (system-wide)
-Ollama models available:
-  gemma4:latest              (8B E4B, Q4_K_M, 9.6GB) ← primary LLM
-  nomic-embed-text:latest    (274MB) ← embedding model
-  starcoder:15b
-  dolphincoder:7b
-  openclaw:latest
-  uandinotai/dolphin-uncensored:latest
+Ollama models:
+  gemma4:latest              (9.6GB) ← primary LLM — VERIFIED REAL MODEL
+  nomic-embed-text:latest    (274MB) ← embedding
+  starcoder:15b, dolphincoder:7b, openclaw:latest, uandinotai/dolphin-uncensored:latest
 
 Key paths:
-  /mnt/data/git/AI/MonVisor/    ← MonVisor project root
-  /mnt/data/git/mon-proj/       ← Corpus (RAG knowledge source)
-  ~/.monvisor/                  ← Runtime data (state.db, chroma/, reports/, configs/)
+  /mnt/data/git/AI/MonVisor/          = /home/james/git/AI/MonVisor/ (same mount)
+  /mnt/data/git/AI/MonVisor-Corpus/   = /home/james/git/AI/MonVisor-Corpus/
+  ~/.monvisor/                         ← runtime (state.db, chroma/, reports/, configs/)
+  ~/.venvs/monvisor/                   ← installed venv (from installer)
 
-Installed packages (system-wide, relevant):
-  monvisor 0.1.0 (editable install)
-  chromadb, ollama, click, rich, fastapi, uvicorn, jinja2
-  python-nmap, bcrypt, itsdangerous, httpx, paramiko, pyyaml
+Dev install: editable (pip install -e .) in system Python
 
 ---
 
 ## RESUME INSTRUCTIONS
 
-1. Read this file for current status
-2. Read ENGINEERING_MAP.md for full technical detail
-3. *** START HERE: Phase 4.6 above has the exact "NEXT SESSION" commands to
-   finish the v0.1.0 GitHub release, then the VM end-to-end test. The release
-   is built and tagged locally but NOT pushed/published yet. ***
-4. The monvisor command (dev) is available; RAG store on Bairn is populated (231)
-5. No need to re-run init on Bairn unless state.db is lost
-
-To verify the dev install is still working:
-  monvisor --help
-  monvisor knowledge status        # expect 231 / 14
-
-To confirm where the release stands:
-  cd ~/git/AI/MonVisor
-  git log --oneline -1             # local HEAD (was 573af0e)
-  git log --oneline -1 origin/main # remote (was stale at 747d149)
-  ls dist/                         # built wheel + sdist present?
-  curl -fsSL -o /dev/null -w "%{http_code}\n" https://github.com/linuxrebel/MonVisor/releases/download/v0.1.0/monvisor-0.1.0-py3-none-any.whl
-  # 404 = release not published yet; 200 = done, proceed to VM test
+1. Read this file top to bottom — all state is here.
+2. Read ENGINEERING_MAP.md for technical architecture detail.
+3. Verify dev environment still working:
+     cd ~/git/AI/MonVisor
+     git log --oneline -1             # expect 7d2cf6c
+     monvisor knowledge status        # expect 231 / 51
+     python3 -m pytest -q             # expect 16 passed
+4. START HERE for next work: "PENDING" section above.
+   - If doing VM test: rebuild tarball first with build_release_tarball.sh
+   - If doing Phase 5: read ENGINEERING_MAP.md Phase 5 section
+   - If doing corpus update: follow "Knowledge update / re-bundle procedure" above
