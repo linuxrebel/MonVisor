@@ -13,6 +13,19 @@ data leaves the host and there is no API cost.
 >
 > **Latest release:** [v0.1.1](https://github.com/linuxrebel/MonVisor/releases/tag/v0.1.1) · [all releases](https://github.com/linuxrebel/MonVisor/releases)
 
+## Contents
+
+- [How it works](#how-it-works)
+- [Requirements](#requirements)
+- [Install](#install)
+- [Quick start](#quick-start)
+- [Asking the AI](#asking-the-ai)
+- [Configuration](#configuration)
+- [Tiers](#tiers)
+- [Planning and Roadmap](#planning-and-roadmap)
+- [Development](#development)
+- [License](#license)
+
 ## How it works
 
 ```
@@ -234,13 +247,13 @@ AWS IAM, SAML).
 The `docs/` and `MD-Files/` directories contain the full architecture and
 execution planning documents for MonVisor's next development phases (4.7–4.12).
 
-| Document | Format | Description |
-|---|---|---|
-| [Architectural roadmap](MD-Files/Architectural_roadmap.md) · [docx](docs/Architectural_roadmap.docx) | MD / Word | Product philosophy, deployment model, entry points, and full phase-by-phase plan for phases 4.7–4.12 |
-| [Engineering map](MD-Files/Engineering_map.md) · [docx](docs/Engineering_map.docx) | MD / Word | Technology stack, file structure, SQLite schema, ChromaDB collections, all workflows, and build phase status |
-| [Execution plan](MD-Files/Monvisor_execution_plan.html) | HTML | Interactive dependency tree — red = to do, green = complete. Open locally in any browser; works fully offline. |
+| Document | Description |
+|---|---|
+| Architectural roadmap &nbsp; [[MD]](MD-Files/Architectural_roadmap.md) [[Docx]](docs/Architectural_roadmap.docx?raw=true) | Product philosophy, deployment model, entry points, and full phase-by-phase plan for phases 4.7–4.12 |
+| Engineering map &nbsp; [[MD]](MD-Files/Engineering_map.md) [[Docx]](docs/Engineering_map.docx?raw=true) | Technology stack, file structure, SQLite schema, ChromaDB collections, all workflows, and build phase status |
+| [Execution plan ↗](https://htmlpreview.github.io/?https://github.com/linuxrebel/MonVisor/blob/main/MD-Files/Monvisor_execution_plan.html) | Interactive dependency tree — red = to do, green = complete. Click to open rendered in your browser. |
 
-The execution plan HTML can be opened directly from a clone without a server:
+The execution plan also opens locally from a clone (no server needed):
 
 ```bash
 xdg-open MD-Files/Monvisor_execution_plan.html   # Linux
