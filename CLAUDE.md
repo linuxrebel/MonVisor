@@ -12,6 +12,16 @@ git branch --show-current
 
 If it is not `development`, switch to it (`git checkout development`) before editing. `main` is reserved for releases/merges only.
 
+### Merge workflow
+
+Commit on `development` → push → checkout `main` → `git merge --ff-only development` → push main → checkout `development`.
+
+### Before editing or merging
+
+- **Always `git pull` first.** Remote changes may have been pushed from another session or machine.
+- Commits are authored as James's user — do not configure or override `user.name` / `user.email`. The system gitconfig is already correct.
+- Never commit build output or release tarballs (`build/`, `dist/`, packages). They belong on the GitHub Releases page only.
+
 ## Workflow
 
 - **Ask before coding.** Before writing code or making changes, ask first and get the go-ahead.
