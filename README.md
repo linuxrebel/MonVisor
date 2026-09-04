@@ -263,7 +263,12 @@ open MD-Files/Monvisor_execution_plan.html        # macOS
 
 ## Development
 
+All work happens on the `development` branch, never directly on `main`
+(`main` is reserved for releases). See [CLAUDE.md](CLAUDE.md) for the full
+branch and workflow policy.
+
 ```bash
+git checkout development
 pip install -e .
 python -m build        # build sdist + wheel into dist/
 ```

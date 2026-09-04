@@ -28,6 +28,16 @@ Open planning questions to resolve next session:
 
 ---
 
+## GIT WORKFLOW (READ BEFORE EDITING)
+
+All work happens on the `development` branch, never directly on `main` — `main`
+is reserved for releases/merges. Verify the branch (`git branch --show-current`)
+and switch to `development` before making changes. The full policy (branch, merge
+flow, git-pull-first, authorship, no build artifacts, ask-before-coding,
+plan-first) lives in `CLAUDE.md` at the repo root.
+
+---
+
 ## CURRENT STATUS (v0.1.1)
 
 ### Release
@@ -228,7 +238,8 @@ Dev install: editable (pip install -e .) in system Python.
 1. Read this file top to bottom, then ENGINEERING_MAP.md for architecture detail.
 2. Verify the dev environment:
      cd ~/git/AI/MonVisor
-     git log --oneline -1             # expect 2716968 (or later doc commits)
+     git branch --show-current        # expect 'development' (work here, not main)
+     git log --oneline -1             # expect the latest doc commit
      git status -s                    # expect clean
      monvisor knowledge status        # expect 231 / 51
      python3 -m pytest -q             # expect 16 passed
