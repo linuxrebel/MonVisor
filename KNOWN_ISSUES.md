@@ -4,7 +4,23 @@ Working list of open problems blocking a solid free-tier base. Paid-tier (Phase 
 work is on hold until these are resolved. Newest findings at the bottom of each
 section.
 
-Legend: 🔴 blocker · 🟠 broken feature · 🟡 gap/UX · 🔵 needs investigation
+Legend: 🔴 blocker · 🟠 broken feature · 🟡 gap/UX · 🔵 needs investigation · 📋 backlog task
+
+---
+
+## Backlog / tasks
+
+### T1 📋 Refresh RAG corpus with current Prometheus + Grafana docs
+The bundled knowledge (`pairs`/`exemplars`) needs updating against current
+Prometheus and Grafana documentation — config syntax, exporters, PromQL,
+alerting/rules, and Grafana provisioning drift over releases and the corpus is
+from the initial build. Stale knowledge → stale generated configs and answers.
+- Corpus source lives in the separate `MonVisor-Corpus` repo (CC BY-SA 4.0), not
+  this repo. Update the shards there, rebuild `combined.jsonl`, re-bundle into
+  `monvisor/knowledge/`, then `monvisor init --reset-knowledge`.
+- Re-bundle procedure: see `MD-Files/Project_state.md` "Knowledge re-bundle
+  procedure" (steps 1–8) and `scripts/bundle_corpus.sh`.
+- Scope TBD: which doc sources, how much, versions to target.
 
 ---
 
