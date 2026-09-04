@@ -84,7 +84,7 @@ def _resolve_grafana_url(environment: str | None) -> str:
         env = queries.get_environment(environment)
         if env and env.get("grafana_url"):
             return env["grafana_url"].rstrip("/") + "/"
-    setting = queries.get_setting("grafana-url")
+    setting = config.get_user_setting("grafana-url")
     if setting:
         return setting.rstrip("/") + "/"
     return "http://127.0.0.1:3000/"

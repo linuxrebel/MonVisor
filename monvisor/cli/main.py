@@ -124,33 +124,39 @@ def init(reset_knowledge):
 
     # 3. Check Ollama connectivity
     console.print("  Checking Ollama...")
-    try:
-        import ollama
-        from monvisor.config import OLLAMA_URL, OLLAMA_MODEL, OLLAMA_EMBED_MODEL
-        client = ollama.Client(host=OLLAMA_URL)
-        raw = client.list()
-        # Handle both dict-style and object-style responses across ollama versions
-        model_entries = raw.get("models", raw) if isinstance(raw, dict) else raw.models
-        models = []
-        for m in model_entries:
-            if hasattr(m, "model"):
-                models.append(m.model)
-            elif hasattr(m, "name"):
-                models.append(m.name)
-            elif isinstance(m, dict):
-                models.append(m.get("model", m.get("name", "")))
-        llm_ok   = any(OLLAMA_MODEL.split(":")[0] in m for m in models)
-        embed_ok = any(OLLAMA_EMBED_MODEL.split(":")[0] in m for m in models)
-        if llm_ok:
-            console.print(f"  [green]✓[/green] LLM model: {OLLAMA_MODEL}")
-        else:
-            console.print(f"  [yellow]⚠[/yellow]  {OLLAMA_MODEL} not found. Run: ollama pull {OLLAMA_MODEL}")
-        if embed_ok:
-            console.print(f"  [green]✓[/green] Embedding model: {OLLAMA_EMBED_MODEL}")
-        else:
-            console.print(f"  [yellow]⚠[/yellow]  {OLLAMA_EMBED_MODEL} not found. Run: ollama pull {OLLAMA_EMBED_MODEL}")
-    except Exception as e:
-        console.print(f"  [yellow]⚠[/yellow]  Ollama not reachable ({e}). Start Ollama and re-run init.")
+    from monvisor import config as _cfg
+    reachable, detail = _cfg.ollama_status()
+    if not reachable:
+        console.print(f"  [yellow]⚠[/yellow]  {detail}. Start Ollama and re-run init.")
+    else:
+        try:
+            import ollama
+            OLLAMA_MODEL       = _cfg.ollama_model()
+            OLLAMA_EMBED_MODEL = _cfg.OLLAMA_EMBED_MODEL
+            client = ollama.Client(host=_cfg.ollama_url())
+            raw = client.list()
+            # Handle both dict-style and object-style responses across ollama versions
+            model_entries = raw.get("models", raw) if isinstance(raw, dict) else raw.models
+            models = []
+            for m in model_entries:
+                if hasattr(m, "model"):
+                    models.append(m.model)
+                elif hasattr(m, "name"):
+                    models.append(m.name)
+                elif isinstance(m, dict):
+                    models.append(m.get("model", m.get("name", "")))
+            llm_ok   = any(OLLAMA_MODEL.split(":")[0] in m for m in models)
+            embed_ok = any(OLLAMA_EMBED_MODEL.split(":")[0] in m for m in models)
+            if llm_ok:
+                console.print(f"  [green]✓[/green] LLM model: {OLLAMA_MODEL}")
+            else:
+                console.print(f"  [yellow]⚠[/yellow]  {OLLAMA_MODEL} not found. Run: ollama pull {OLLAMA_MODEL}")
+            if embed_ok:
+                console.print(f"  [green]✓[/green] Embedding model: {OLLAMA_EMBED_MODEL}")
+            else:
+                console.print(f"  [yellow]⚠[/yellow]  {OLLAMA_EMBED_MODEL} not found. Run: ollama pull {OLLAMA_EMBED_MODEL}")
+        except Exception as e:
+            console.print(f"  [yellow]⚠[/yellow]  Ollama check failed ({e}). Start Ollama and re-run init.")
 
     # 4. Load knowledge base
     console.print("  Loading knowledge base into RAG store...")
@@ -334,18 +340,18 @@ def config_cmd():
 @click.argument("key")
 @click.argument("value")
 def config_set(key, value):
-    """Set a configuration value (e.g. grafana-url, ollama-url)."""
-    from monvisor.db import queries
-    queries.set_setting(key, value)
-    console.print(f"[green]✓[/green] Set {key} = {value}")
+    """Set a configuration value (e.g. grafana-url, ollama-url, ollama-model)."""
+    from monvisor import config
+    config.set_user_setting(key, value)
+    console.print(f"[green]✓[/green] Set {key} = {value}  [dim]({config.USER_CONFIG_FILE})[/dim]")
 
 
 @config_cmd.command("get")
 @click.argument("key")
 def config_get(key):
     """Get a configuration value."""
-    from monvisor.db import queries
-    val = queries.get_setting(key)
+    from monvisor import config
+    val = config.get_user_setting(key)
     if val:
         console.print(f"{key} = {val}")
     else:
@@ -538,18 +544,25 @@ def ask(question, show_sources):
         f"Question: {question}\n\nAnswer:"
     )
 
+    model = config.ollama_model()
     try:
         import ollama
-        client = ollama.Client(host=config.OLLAMA_URL)
+        client = ollama.Client(host=config.ollama_url())
         resp = client.chat(
-            model=config.OLLAMA_MODEL,
+            model=model,
             messages=[{"role": "user", "content": prompt}],
         )
         answer = (resp["message"]["content"] if isinstance(resp, dict)
                   else resp.message.content).strip()
     except Exception as e:
         console.print(f"[red]Could not reach the local model:[/red] {e}")
-        console.print(f"Check that Ollama is running at {config.OLLAMA_URL}.")
+        reachable, detail = config.ollama_status()
+        if reachable:
+            console.print(f"Ollama is up, but model '{model}' is unavailable. "
+                          f"Run: [bold]ollama pull {model}[/bold]  "
+                          f"or set another: [bold]monvisor config set ollama-model <name>[/bold]")
+        else:
+            console.print(detail + ".")
         sys.exit(1)
 
     if "INSUFFICIENT_CONTEXT" in answer or not answer:

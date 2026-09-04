@@ -34,8 +34,86 @@ CONFIG_FILE    = MONVISOR_HOME / "config.yml"
 
 # ── Ollama defaults ───────────────────────────────────────────────────────────
 OLLAMA_URL         = os.environ.get("MONVISOR_OLLAMA_URL", "http://localhost:11434")
-OLLAMA_MODEL       = "gemma4:latest"
+OLLAMA_MODEL       = "gemma4:latest"          # last-resort default (see ollama_model())
 OLLAMA_EMBED_MODEL = "nomic-embed-text:latest"
+
+# ── User config file (source of truth for user settings) ──────────────────────
+# $HOME/.config/MonVisor/mv.config (YAML). Holds user-facing settings such as
+# ollama-model, ollama-url, grafana-url, blackbox-url. Secret/internal state
+# (auth password hash, knowledge_version) stays in the SQLite settings table.
+USER_CONFIG_DIR  = Path.home() / ".config" / "MonVisor"
+USER_CONFIG_FILE = USER_CONFIG_DIR / "mv.config"
+
+
+def load_user_config() -> dict:
+    """Read the YAML user-config file; empty dict if absent or unreadable."""
+    import yaml
+    try:
+        with open(USER_CONFIG_FILE) as f:
+            data = yaml.safe_load(f) or {}
+        return data if isinstance(data, dict) else {}
+    except FileNotFoundError:
+        return {}
+    except Exception:
+        # A malformed file must not crash the tool; treat as empty.
+        return {}
+
+
+def get_user_setting(key: str, default=None):
+    """Read one key from the user-config file."""
+    return load_user_config().get(key, default)
+
+
+def set_user_setting(key: str, value: str):
+    """Write one key to the user-config file, creating it if needed."""
+    import yaml
+    data = load_user_config()
+    data[key] = value
+    USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    with open(USER_CONFIG_FILE, "w") as f:
+        yaml.safe_dump(data, f, default_flow_style=False, sort_keys=True)
+
+
+def ollama_model() -> str:
+    """Resolve the LLM model: user config file, else documented default."""
+    return get_user_setting("ollama-model") or OLLAMA_MODEL
+
+
+def ollama_url() -> str:
+    """Resolve the Ollama URL: MONVISOR_OLLAMA_URL env, else file, else default."""
+    env = os.environ.get("MONVISOR_OLLAMA_URL")
+    if env:
+        return env
+    return get_user_setting("ollama-url") or "http://localhost:11434"
+
+
+def ollama_status() -> tuple:
+    """Return (reachable: bool, detail: str) for the Ollama daemon.
+
+    API is primary — an HTTP GET on /api/tags proves it is actually usable.
+    ps is the fallback: it matches the daemon process 'ollama serve', NOT
+    'llama-server' (the per-model runner only exists while a model is loaded,
+    so matching it would report an idle-but-running daemon as down).
+    """
+    url = ollama_url()
+    try:
+        import httpx
+        httpx.get(f"{url}/api/tags", timeout=3.0).raise_for_status()
+        return True, f"reachable at {url}"
+    except Exception as api_err:
+        try:
+            import subprocess
+            out = subprocess.run(
+                ["ps", "ax"], capture_output=True, text=True, timeout=3
+            ).stdout
+            if "ollama serve" in out:
+                return False, (
+                    f"Ollama daemon is running but its API is unreachable at "
+                    f"{url} ({api_err})"
+                )
+        except Exception:
+            pass
+        return False, f"Ollama not running (API unreachable at {url})"
 
 # ── Web UI ────────────────────────────────────────────────────────────────────
 WEB_PORT = int(os.environ.get("MONVISOR_PORT", 7373))

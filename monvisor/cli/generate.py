@@ -136,7 +136,7 @@ def _resolve_blackbox_addr(monitored: list[dict]) -> tuple[str, bool]:
     for s in monitored:
         if s["service_type"] == "blackbox_exporter":
             return f"{s['host']}:{s['port']}", True
-    setting = queries.get_setting("blackbox-url")
+    setting = config.get_user_setting("blackbox-url")
     if setting:
         return setting.replace("http://", "").replace("https://", "").rstrip("/"), True
     return "127.0.0.1:9115", False
@@ -165,9 +165,9 @@ def _generate_rules(service_types: list[str]) -> Optional[str]:
         f"{context}"
     )
     try:
-        client = ollama.Client(host=config.OLLAMA_URL)
+        client = ollama.Client(host=config.ollama_url())
         resp = client.chat(
-            model=config.OLLAMA_MODEL,
+            model=config.ollama_model(),
             messages=[{"role": "user", "content": prompt}],
         )
         text = resp["message"]["content"] if isinstance(resp, dict) else resp.message.content
