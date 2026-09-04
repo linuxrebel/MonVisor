@@ -42,11 +42,38 @@ LAN. Coverage is incomplete vs. what is actually on the network.
 - Status: NOT yet reproduced this session (needs a fresh scan — network noise +
   consent). Repro target: `monvisor scan prod` should find ~13, not 3.
 
-### R2 🟠 Prometheus config generation not proven end-to-end
-`monvisor generate` has not been confirmed to produce a viable, promtool-valid
-Prometheus config against real discovered services.
-- Blocked behind I1/I2 below (LLM model wiring) — generate calls the model.
-- Status: NOT yet exercised this session (blocked).
+### R2 🟠 `monvisor generate` — partially works, two real bugs (exercised 2026-09-04)
+Ran `generate prod` against the 8 existing monitored services (no rescan). The
+deterministic `prometheus.yml` was produced, promtool-checked, and persisted to the
+`configs` table — but two bugs surfaced. Split into R2a / R2b.
+
+#### R2a 🔴 rules.yml generation hangs — no timeout / no reasoning cap on the LLM call
+`_generate_rules()` (`monvisor/cli/generate.py:145`) makes a single ollama
+`client.chat` call with no timeout and no reasoning control. With a *thinking*
+model (ornith) on CPU it runs away — killed after 20+ min CPU, never returned.
+prometheus.yml printed ✓, then the whole command hung on the rules step, so
+`generate` never completes on this hardware and `rules.yml` is never written.
+- Same unbounded-call pattern is in `ask` (survived only because its output was
+  short). This is I4 materialising for `generate`.
+- Fix scope: pass a request timeout and cap generation (e.g. `options` num_predict
+  / disable thinking or set reasoning effort) on the ollama calls; on timeout, emit
+  a clear message and still leave prometheus.yml in place.
+
+#### R2b 🟠 generate silently drops services with no native exporter (7 of 8)
+Only `node_exporter` (192.168.87.36:9100) reached `prometheus.yml`. The other 7
+monitored services (dnsmasq, lighttpd×2, nginx×2, http_generic, openssh) were
+dropped with no warning.
+- Root cause: routing at `generate.py:239-241`. `scrapeable` = type in `_SCRAPEABLE`
+  and `monitor_mode != 'blackbox'`; `blackbox` = `monitor_mode == 'blackbox'`. All 8
+  services have `monitor_mode = NULL` because **`review` sets `monitor=1` but never
+  assigns `monitor_mode`**. Non-exporter services are therefore neither scrapeable
+  nor blackbox → silently excluded.
+- Effect: the README's "blackbox fallback for un-instrumentable hosts" and "exporter
+  recommendations" never trigger. A service the user approved just disappears.
+- Fix scope: `review` must let the user choose a monitor mode (exporter / blackbox /
+  skip) per service, or generate must default un-instrumentable approved services to
+  blackbox and/or surface exporter recommendations instead of dropping them.
+- Related: R4 (add/remove exporters), roadmap Phase 4.8a `configure`.
 
 ### R3 🟡 No Grafana integration
 No working hook into Grafana (datasource/dashboard provisioning). Listed as
