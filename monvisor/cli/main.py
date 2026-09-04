@@ -546,14 +546,7 @@ def ask(question, show_sources):
 
     model = config.ollama_model()
     try:
-        import ollama
-        client = ollama.Client(host=config.ollama_url())
-        resp = client.chat(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        answer = (resp["message"]["content"] if isinstance(resp, dict)
-                  else resp.message.content).strip()
+        answer = config.ollama_chat(prompt).strip()
     except Exception as e:
         console.print(f"[red]Could not reach the local model:[/red] {e}")
         reachable, detail = config.ollama_status()

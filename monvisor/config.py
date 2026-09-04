@@ -87,6 +87,39 @@ def ollama_url() -> str:
     return get_user_setting("ollama-url") or "http://localhost:11434"
 
 
+# ── Ollama call bounds ────────────────────────────────────────────────────────
+OLLAMA_TIMEOUT_S   = 180    # wall-clock cap per LLM call (httpx read timeout)
+OLLAMA_NUM_PREDICT = 1024   # max tokens generated — bounds runaway generation
+
+
+def ollama_chat(prompt: str, *, system: str = None, think: bool = False,
+                temperature: float = 0.0, num_predict: int = OLLAMA_NUM_PREDICT,
+                timeout: int = OLLAMA_TIMEOUT_S) -> str:
+    """Single-shot chat with bounded generation and a wall-clock timeout.
+
+    Thinking is disabled by default (think=False): the reference models are
+    reasoning-capable and, left unbounded on CPU, spend many minutes generating a
+    reasoning block before any answer — which is what makes `generate` hang. The
+    num_predict cap and the client timeout are backstops. Raises on timeout or
+    transport error; the caller decides how to surface it.
+    """
+    import ollama
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    client = ollama.Client(host=ollama_url(), timeout=timeout)
+    opts = {"temperature": temperature, "num_predict": num_predict}
+    try:
+        resp = client.chat(model=ollama_model(), messages=messages,
+                           think=think, options=opts)
+    except TypeError:
+        # Older ollama-python without the `think` kwarg — still bounded by opts.
+        resp = client.chat(model=ollama_model(), messages=messages, options=opts)
+    return (resp["message"]["content"] if isinstance(resp, dict)
+            else resp.message.content)
+
+
 def ollama_status() -> tuple:
     """Return (reachable: bool, detail: str) for the Ollama daemon.
 

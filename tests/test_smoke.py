@@ -133,5 +133,54 @@ class TestRecommend(unittest.TestCase):
         self.assertNotIn("h1", recommendations(svcs))
 
 
+class TestOllamaChat(unittest.TestCase):
+    """config.ollama_chat must bound generation (num_predict, timeout) and
+    disable thinking, and must still work on an ollama-python without `think`."""
+
+    def _run_with_fake(self, FakeClient):
+        import sys, types
+        fake = types.ModuleType("ollama")
+        fake.Client = FakeClient
+        saved = sys.modules.get("ollama")
+        sys.modules["ollama"] = fake
+        try:
+            return config.ollama_chat("hi", num_predict=222, timeout=99)
+        finally:
+            if saved is not None:
+                sys.modules["ollama"] = saved
+            else:
+                del sys.modules["ollama"]
+
+    def test_bounds_and_think_passed(self):
+        captured = {}
+
+        class Fake:
+            def __init__(self, host=None, **kw):
+                captured["init"] = kw
+
+            def chat(self, **kw):
+                captured["chat"] = kw
+                return {"message": {"content": "ok"}}
+
+        out = self._run_with_fake(Fake)
+        self.assertEqual(out, "ok")
+        self.assertEqual(captured["init"].get("timeout"), 99)
+        self.assertEqual(captured["chat"]["options"]["num_predict"], 222)
+        self.assertIs(captured["chat"]["think"], False)
+
+    def test_think_kwarg_fallback(self):
+        class Fake:
+            def __init__(self, host=None, **kw):
+                pass
+
+            def chat(self, **kw):
+                if "think" in kw:
+                    raise TypeError("unexpected keyword argument 'think'")
+                return {"message": {"content": "fallback"}}
+
+        out = self._run_with_fake(Fake)
+        self.assertEqual(out, "fallback")
+
+
 if __name__ == "__main__":
     unittest.main()

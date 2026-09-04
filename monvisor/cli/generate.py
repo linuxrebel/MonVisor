@@ -145,7 +145,6 @@ def _resolve_blackbox_addr(monitored: list[dict]) -> tuple[str, bool]:
 def _generate_rules(service_types: list[str]) -> Optional[str]:
     """Use RAG + Ollama to draft alerting rules for the given service types."""
     try:
-        import ollama
         from monvisor.rag.query import build_context
     except Exception as e:
         console.print(f"  [yellow]\u26a0[/yellow]  Rules generation unavailable ({e})")
@@ -165,14 +164,12 @@ def _generate_rules(service_types: list[str]) -> Optional[str]:
         f"{context}"
     )
     try:
-        client = ollama.Client(host=config.ollama_url())
-        resp = client.chat(
-            model=config.ollama_model(),
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = resp["message"]["content"] if isinstance(resp, dict) else resp.message.content
+        text = config.ollama_chat(prompt, num_predict=2048)
     except Exception as e:
-        console.print(f"  [yellow]\u26a0[/yellow]  Ollama call failed ({e})")
+        console.print(
+            f"  [yellow]\u26a0[/yellow]  rules.yml generation failed or timed out ({e}). "
+            "prometheus.yml is unaffected."
+        )
         return None
 
     return _strip_fences(text)
