@@ -88,36 +88,46 @@ def ollama_url() -> str:
 
 
 # ── Ollama call bounds ────────────────────────────────────────────────────────
-OLLAMA_TIMEOUT_S   = 180    # wall-clock cap per LLM call (httpx read timeout)
-OLLAMA_NUM_PREDICT = 1024   # max tokens generated — bounds runaway generation
+OLLAMA_TIMEOUT_S      = 180   # hard total wall-clock cap per call (enforced by us)
+OLLAMA_IDLE_TIMEOUT_S = 120   # max wait for the NEXT token (httpx read timeout)
+OLLAMA_NUM_PREDICT    = 1024  # max tokens generated — bounds runaway generation
 
 
 def ollama_chat(prompt: str, *, system: str = None, think: bool = False,
                 temperature: float = 0.0, num_predict: int = OLLAMA_NUM_PREDICT,
                 timeout: int = OLLAMA_TIMEOUT_S) -> str:
-    """Single-shot chat with bounded generation and a wall-clock timeout.
+    """Single-shot chat with a hard, self-enforced wall-clock deadline.
 
-    Thinking is disabled by default (think=False): the reference models are
-    reasoning-capable and, left unbounded on CPU, spend many minutes generating a
-    reasoning block before any answer — which is what makes `generate` hang. The
-    num_predict cap and the client timeout are backstops. Raises on timeout or
-    transport error; the caller decides how to surface it.
+    Two independent bounds, because httpx's own timeout is only per-read (it does
+    not cap a response that keeps streaming tokens):
+      * `timeout` — total wall-clock, enforced here by streaming and checking the
+        clock on every chunk. This is what actually terminates a slow generation.
+      * OLLAMA_IDLE_TIMEOUT_S — httpx read timeout; catches a truly stalled server
+        that stops emitting tokens (e.g. never sends the first one).
+    Plus `think=False` (the reasoning phase is what runs away on CPU) and the
+    num_predict cap. Raises TimeoutError past the deadline, or on transport error;
+    the caller decides how to surface it.
     """
-    import ollama
+    import ollama, time
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
-    client = ollama.Client(host=ollama_url(), timeout=timeout)
+    client = ollama.Client(host=ollama_url(), timeout=OLLAMA_IDLE_TIMEOUT_S)
     opts = {"temperature": temperature, "num_predict": num_predict}
+    kw = dict(model=ollama_model(), messages=messages, options=opts, stream=True)
     try:
-        resp = client.chat(model=ollama_model(), messages=messages,
-                           think=think, options=opts)
+        stream = client.chat(think=think, **kw)
     except TypeError:
-        # Older ollama-python without the `think` kwarg — still bounded by opts.
-        resp = client.chat(model=ollama_model(), messages=messages, options=opts)
-    return (resp["message"]["content"] if isinstance(resp, dict)
-            else resp.message.content)
+        # Older ollama-python without the `think` kwarg — still bounded otherwise.
+        stream = client.chat(**kw)
+    parts, start = [], time.monotonic()
+    for chunk in stream:
+        parts.append(chunk["message"]["content"] if isinstance(chunk, dict)
+                     else chunk.message.content)
+        if time.monotonic() - start > timeout:
+            raise TimeoutError(f"generation exceeded {timeout}s")
+    return "".join(parts)
 
 
 def ollama_status() -> tuple:

@@ -160,11 +160,13 @@ class TestOllamaChat(unittest.TestCase):
 
             def chat(self, **kw):
                 captured["chat"] = kw
-                return {"message": {"content": "ok"}}
+                # streamed response: assembled to "ok"
+                return iter([{"message": {"content": "o"}},
+                             {"message": {"content": "k"}}])
 
         out = self._run_with_fake(Fake)
         self.assertEqual(out, "ok")
-        self.assertEqual(captured["init"].get("timeout"), 99)
+        self.assertIs(captured["chat"]["stream"], True)
         self.assertEqual(captured["chat"]["options"]["num_predict"], 222)
         self.assertIs(captured["chat"]["think"], False)
 
@@ -176,10 +178,38 @@ class TestOllamaChat(unittest.TestCase):
             def chat(self, **kw):
                 if "think" in kw:
                     raise TypeError("unexpected keyword argument 'think'")
-                return {"message": {"content": "fallback"}}
+                return iter([{"message": {"content": "fallback"}}])
 
         out = self._run_with_fake(Fake)
         self.assertEqual(out, "fallback")
+
+    def test_hard_deadline_raises(self):
+        import time
+
+        class Fake:
+            def __init__(self, host=None, **kw):
+                pass
+
+            def chat(self, **kw):
+                def gen():
+                    while True:            # never stops on its own
+                        time.sleep(0.01)
+                        yield {"message": {"content": "x"}}
+                return gen()
+
+        import sys, types
+        fake = types.ModuleType("ollama")
+        fake.Client = Fake
+        saved = sys.modules.get("ollama")
+        sys.modules["ollama"] = fake
+        try:
+            with self.assertRaises(TimeoutError):
+                config.ollama_chat("hi", timeout=0.05, num_predict=10)
+        finally:
+            if saved is not None:
+                sys.modules["ollama"] = saved
+            else:
+                del sys.modules["ollama"]
 
 
 if __name__ == "__main__":

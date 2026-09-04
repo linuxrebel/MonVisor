@@ -47,17 +47,29 @@ Ran `generate prod` against the 8 existing monitored services (no rescan). The
 deterministic `prometheus.yml` was produced, promtool-checked, and persisted to the
 `configs` table — but two bugs surfaced. Split into R2a / R2b.
 
-#### R2a 🔴 rules.yml generation hangs — no timeout / no reasoning cap on the LLM call
-`_generate_rules()` (`monvisor/cli/generate.py:145`) makes a single ollama
-`client.chat` call with no timeout and no reasoning control. With a *thinking*
-model (ornith) on CPU it runs away — killed after 20+ min CPU, never returned.
-prometheus.yml printed ✓, then the whole command hung on the rules step, so
-`generate` never completes on this hardware and `rules.yml` is never written.
-- Same unbounded-call pattern is in `ask` (survived only because its output was
-  short). This is I4 materialising for `generate`.
-- Fix scope: pass a request timeout and cap generation (e.g. `options` num_predict
-  / disable thinking or set reasoning effort) on the ollama calls; on timeout, emit
-  a clear message and still leave prometheus.yml in place.
+#### R2a ✅ FIXED — rules.yml generation hung; now a hard wall-clock deadline
+Was: `_generate_rules()` made an unbounded ollama `client.chat` call. On CPU it
+ran for many minutes and `generate` never completed; the whole command hung on the
+rules step after prometheus.yml.
+- Measured root cause (not prefill — prefill is only ~7.5s for the 5.4 KB rules
+  prompt): generation on this 4 GB box runs at ~3 tok/s at that context size, so
+  the `num_predict=2048` rules request needs ~11 min of generation. Also httpx's
+  own `timeout` is only per-read (does not cap a response that keeps streaming), so
+  it was an unreliable bound (observed 187s one run, 656s another).
+- Fix: `config.ollama_chat()` now streams and enforces a **hard total wall-clock
+  deadline itself** (checks the clock on every chunk, raises `TimeoutError` past
+  `OLLAMA_TIMEOUT_S`=180), plus an httpx read timeout (`OLLAMA_IDLE_TIMEOUT_S`=120)
+  to catch a stalled server, `think=False`, and the `num_predict` cap. `ask` and
+  the rules step both route through it. On timeout the rules step prints a clear
+  message and returns None — prometheus.yml is untouched and `generate` exits 0.
+- Verified: `generate prod` completes deterministically in ~184s (180s deadline +
+  overhead), exit 0, "✓ Done", prometheus.yml written, rules skipped cleanly.
+- Expected behaviour by hardware: on this CPU-only box rules.yml is skipped by
+  design (2048 tokens can't finish in 180s at ~3 tok/s). On a GPU box (tens of
+  tok/s) the same call finishes well under the deadline and rules.yml generates.
+  Tunable via `OLLAMA_TIMEOUT_S` / `num_predict` if a slow box must produce rules.
+- Tests: `TestOllamaChat` covers the bounds, the `think` fallback, and the hard
+  deadline. Suite 19/19.
 
 #### R2b 🟠 generate silently drops services with no native exporter (7 of 8)
 Only `node_exporter` (192.168.87.36:9100) reached `prometheus.yml`. The other 7
