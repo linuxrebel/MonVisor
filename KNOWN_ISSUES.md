@@ -58,15 +58,16 @@ so the model could not be changed without editing source.
 - Note: any old `grafana-url`/`blackbox-url` values in the SQLite settings table
   are NOT migrated — re-set them with `config set` if they were configured.
 
-### I2 🟠 Default model `gemma4:latest` no longer installed (env drift)
-Shipped default LLM `gemma4:latest` is gone from the local Ollama (present now:
-qwen3.5, ornith, dolphin3, qwen2.5, granite4.1; `nomic-embed-text` embed still
-present). Mitigated on this box by pointing `ollama-model` at `ornith:latest` via
-mv.config. Still OPEN as a project decision: pick a maintained shipping default,
-and update README/INSTALL/config.py `OLLAMA_MODEL` accordingly.
-- Note: `ornith`/qwen3.5 are 9B — they do not fit the RTX 3050 4GB and run on CPU
-  (multi-minute `ask` latency). For snappy interactive use consider a 3B default
-  (e.g. `granite4.1:3b`). Tuning decision, deferred.
+### I2 🟡 Shipping default model — deferred (not a blocker)
+Shipped default `gemma4:latest` is gone from the local Ollama. Resolved for now by
+pointing `ollama-model` at `ornith:latest` via mv.config — this works and is the
+accepted state. Decision (2026-09-04): do NOT swap the LLM now.
+- ornith is 9B; on this box it runs ~69% CPU / 31% GPU (RTX 3050 4GB, spills to
+  CPU → multi-minute `ask`). Acceptable — a commercial deployment will have more
+  VRAM headroom, and even if it does not, it works, which is what matters.
+- Left OPEN only as low-priority housekeeping: at some point align the documented
+  shipping default (README/INSTALL/config.py `OLLAMA_MODEL`) with a maintained,
+  pullable model. No urgency.
 
 ### I3 ✅ FIXED — misleading model-error message
 Was: on a missing model the error said "Check that Ollama is running…" even though
