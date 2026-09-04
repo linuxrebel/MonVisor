@@ -29,11 +29,18 @@ from the initial build. Stale knowledge → stale generated configs and answers.
 ### R1 🟠 Scan misses hosts and services on a real home network
 `monvisor scan` did not detect all live IPs and running services on James's home
 LAN. Coverage is incomplete vs. what is actually on the network.
-- Suspected area: `monvisor/cli/scan.py` (single-pass nmap today), port list in
-  `config.py` (`ALL_PORTS`), fingerprinting.
+- **Ground truth: 13 devices live on 192.168.87.0/24.** The June scans
+  (`discoveries` in state.db) found only **3 hosts** (host_count=3) — a 3/13 miss,
+  ~77% of devices undetected.
+- Services found were only on those 3 hosts (.27 dnsmasq/lighttpd, .33 nginx,
+  .36 openssh/node_exporter).
+- Suspected area: `monvisor/cli/scan.py` (single-pass nmap today), host-discovery
+  method (many devices — IoT/printers/phones — won't answer the probes used), port
+  list in `config.py` (`ALL_PORTS`), fingerprinting.
 - The Architectural_roadmap Phase 4.9 "two-pass scan + hosts table" is the planned
   overhaul, but this is first a correctness bug to reproduce on the current code.
-- Status: NOT yet reproduced/diagnosed this session.
+- Status: NOT yet reproduced this session (needs a fresh scan — network noise +
+  consent). Repro target: `monvisor scan prod` should find ~13, not 3.
 
 ### R2 🟠 Prometheus config generation not proven end-to-end
 `monvisor generate` has not been confirmed to produce a viable, promtool-valid
